@@ -11,6 +11,7 @@ class OrderExecutor:
         self.ib = IB()
         self.client_id = settings.IB_CLIENT_ID
         self._connected = False
+        self._pnl_subscribed = False
 
     async def connect(self):
         """
@@ -26,10 +27,29 @@ class OrderExecutor:
                 )
                 self._connected = True
                 logger.info("Connected to IB.")
+                
+                # Subscribe to PnL updates
+                await self._subscribe_pnl()
+                
             except Exception as e:
                 logger.error(f"Failed to connect to IB: {e}")
                 self._connected = False
                 raise
+    
+    async def _subscribe_pnl(self):
+        """Subscribe to PnL updates for the account"""
+        if self._pnl_subscribed:
+            return
+            
+        try:
+            accounts = self.ib.managedAccounts()
+            if accounts:
+                account = accounts[0] if isinstance(accounts, list) else accounts.split(',')[0]
+                self.ib.reqPnL(account)
+                self._pnl_subscribed = True
+                logger.info(f"Subscribed to PnL updates for account {account}")
+        except Exception as e:
+            logger.error(f"Failed to subscribe to PnL: {e}")
 
     async def execute_order(self, signal: Signal) -> IBTrade:
         """
@@ -185,40 +205,41 @@ class OrderExecutor:
         if not self.ib.isConnected():
             await self.connect()
         
-        # Get account number
-        accounts = self.ib.managedAccounts()
-        if accounts:
-            account = accounts[0] if isinstance(accounts, list) else accounts.split(',')[0]
-        else:
-            account = ""
-        
-        if not account:
-            logger.error("No account found for PnL request")
-            return {"dailyPnL": 0.0, "unrealizedPnL": 0.0, "realizedPnL": 0.0}
+        # Ensure we're subscribed
+        if not self._pnl_subscribed:
+            await self._subscribe_pnl()
+            # Wait for data to arrive
+            await asyncio.sleep(0.5)
         
         try:
-            # Subscribe to PnL updates (if not already subscribed)
-            pnl_obj = self.ib.reqPnL(account)
+            # Get account number
+            accounts = self.ib.managedAccounts()
+            if not accounts:
+                logger.error("No account found for PnL request")
+                return {"dailyPnL": 0.0, "unrealizedPnL": 0.0, "realizedPnL": 0.0}
             
-            # Wait briefly for the data to arrive
-            await asyncio.sleep(0.5)
+            account = accounts[0] if isinstance(accounts, list) else accounts.split(',')[0]
             
             # Get the latest PnL data
             pnl_list = self.ib.pnl(account)
             
             if pnl_list:
                 pnl = pnl_list[0]
-                return {
-                    "dailyPnL": float(pnl.dailyPnL) if pnl.dailyPnL else 0.0,
-                    "unrealizedPnL": float(pnl.unrealizedPnL) if pnl.unrealizedPnL else 0.0,
-                    "realizedPnL": float(pnl.realizedPnL) if pnl.realizedPnL else 0.0
+                result = {
+                    "dailyPnL": float(pnl.dailyPnL) if pnl.dailyPnL is not None else 0.0,
+                    "unrealizedPnL": float(pnl.unrealizedPnL) if pnl.unrealizedPnL is not None else 0.0,
+                    "realizedPnL": float(pnl.realizedPnL) if pnl.realizedPnL is not None else 0.0
                 }
+                logger.debug(f"PnL data: {result}")
+                return result
             else:
-                logger.warning("No PnL data available")
+                logger.warning("No PnL data available from subscription")
                 return {"dailyPnL": 0.0, "unrealizedPnL": 0.0, "realizedPnL": 0.0}
         
         except Exception as e:
+            import traceback
             logger.error(f"Error getting daily PnL: {e}")
+            logger.error(f"Traceback: {traceback.format_exc()}")
             return {"dailyPnL": 0.0, "unrealizedPnL": 0.0, "realizedPnL": 0.0}
 
     async def get_all_positions(self):

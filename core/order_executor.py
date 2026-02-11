@@ -72,6 +72,9 @@ class OrderExecutor:
         return trade
 
     async def _calculate_quantity(self, signal: Signal) -> float:
+        # NOTE: IB does not accept "Dollar Amount" orders directly for Stocks in a simple way easily via API without conditions.
+        # We calculate the share count client-side based on the current price.
+        
         # Check trade_power first
         if signal.trade_power:
             try:
@@ -173,7 +176,39 @@ class OrderExecutor:
         reqs = self.ib.reqOpenOrders()
         for order in reqs:
             self.ib.cancelOrder(order)
-            
+
+    async def get_open_orders(self):
+        if not self.ib.isConnected():
+            await self.connect()
+        
+        # reqOpenOrders returns a list of existing Order objects (not Trades)
+        # But commonly we want the Trade object to see status? 
+        # ib.reqOpenOrders() returns list of Order.
+        # ib.openTrades() returns list of Trade objects for open orders (better).
+        
+        trades = self.ib.openTrades()
+        results = []
+        for t in trades:
+            results.append({
+                "orderId": t.order.orderId,
+                "symbol": t.contract.symbol,
+                "action": t.order.action,
+                "quantity": t.order.totalQuantity,
+                "type": t.order.orderType,
+                "price": t.order.lmtPrice if t.order.lmtPrice else 0.0,
+                "status": t.orderStatus.status
+            })
+        return results
+
+    async def cancel_order(self, order_id: int):
+        # Find the open order
+        trades = self.ib.openTrades()
+        for t in trades:
+            if t.order.orderId == order_id:
+                self.ib.cancelOrder(t.order)
+                return True
+        return False
+
     async def close_all_positions(self):
         positions = self.ib.positions()
         for pos in positions:

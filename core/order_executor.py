@@ -74,7 +74,21 @@ class OrderExecutor:
     async def _calculate_quantity(self, signal: Signal) -> float:
         # NOTE: IB does not accept "Dollar Amount" orders directly for Stocks in a simple way easily via API without conditions.
         # We calculate the share count client-side based on the current price.
-        
+
+        # Pre-fetch position for SELL to enforce "No Shorting" and optimization
+        current_pos_size = 0.0
+        if signal.action == 'sell':
+            positions = await self.get_all_positions()
+            for p in positions:
+                if p.contract.symbol == signal.ticker:
+                    current_pos_size = p.position
+                    break
+            
+            # Enforce: Don't short if no open position
+            if current_pos_size == 0:
+                logger.warning(f"No open position for {signal.ticker}. Cannot SELL.")
+                raise ValueError(f"No open position {signal.ticker}")
+
         # Check trade_power first
         if signal.trade_power:
             try:
@@ -97,7 +111,10 @@ class OrderExecutor:
 
         # If numeric, return as is
         if isinstance(signal.quantity, (int, float)):
-            return float(signal.quantity)
+             # Ensure we don't sell more than we have?
+             # User didn't strictly ask for this, but it's good practice to prevent flipping to short.
+             # But let's stick to the requested "no open position" rule for now.
+             return float(signal.quantity)
         
         # If string percentage
         if isinstance(signal.quantity, str) and signal.quantity.endswith('%'):
@@ -123,20 +140,19 @@ class OrderExecutor:
                     return 0
 
             elif signal.action == 'sell':
-                # Get current position
-                positions = await self.get_all_positions()
-                position_size = 0
-                for pos in positions:
-                    if pos.contract.symbol == signal.ticker:
-                        position_size = pos.position
-                        break
-                
-                if position_size > 0:
-                    qty = int(position_size * pct)
-                    logger.info(f"Calculated SELL qty for {signal.ticker}: {qty} shares ({pct*100}% of {position_size})")
+                # Use pre-fetched current_pos_size
+                if current_pos_size > 0:
+                    qty = int(current_pos_size * pct)
+                    logger.info(f"Calculated SELL qty for {signal.ticker}: {qty} shares ({pct*100}% of {current_pos_size})")
                     return qty
                 else:
-                    logger.warning(f"No position found for {signal.ticker} to sell")
+                    # Short position handling (if current_pos_size < 0)?
+                    # The percentage logic typically applies to Long positions. 
+                    # If Short, logic implies shrinking the short? 
+                    # "Sell" on Short adds to Short. "Sell 50%" of -10 is -5. 
+                    # Selling -5 means buying? No.
+                    # Standard logic: "Sell %" implies closing Longs.
+                    logger.warning(f"No positive position found for {signal.ticker} to sell percentage")
                     return 0
 
         try:

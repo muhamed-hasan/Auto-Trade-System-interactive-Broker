@@ -26,6 +26,7 @@ class WebServer:
         self.app.router.add_get('/api/activity', self.handle_activity)
         self.app.router.add_get('/api/orders/open', self.handle_open_orders)
         self.app.router.add_post('/api/orders/cancel', self.handle_cancel_order)
+        self.app.router.add_get('/api/history', self.handle_history)
         self.app.router.add_get('/api/status', self.handle_status)
 
     async def start(self, host="0.0.0.0", port=8080):
@@ -109,6 +110,13 @@ class WebServer:
                 return web.json_response({"status": "cancelled", "order_id": order_id})
             else:
                 return web.json_response({"error": "Order not found or could not cancel"}, status=404)
+        except Exception as e:
+            return web.json_response({"error": str(e)}, status=500)
+
+    async def handle_history(self, request):
+        try:
+            orders = await self.db.get_todays_orders()
+            return web.json_response(orders)
         except Exception as e:
             return web.json_response({"error": str(e)}, status=500)
 

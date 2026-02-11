@@ -289,6 +289,38 @@ body {
     overflow-y: auto;
 }
 
+/* Nav Tabs */
+.nav-tabs {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 4px;
+    border-bottom: 1px solid var(--divider);
+    padding-bottom: 8px;
+}
+
+.nav-tab {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    font-weight: 500;
+    padding: 8px 12px;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: all 0.2s;
+}
+
+.nav-tab:hover {
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.nav-tab.active {
+    color: var(--accent-blue);
+    background: rgba(59, 130, 246, 0.1);
+    font-weight: 600;
+}
+
 .position-card {
     background: var(--bg-dark);
     /* Contrast against card bg */

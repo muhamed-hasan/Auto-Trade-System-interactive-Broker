@@ -3,8 +3,12 @@
 
 const API_BASE = "/api";
 const SYMBOL_CACHE = {};
+let currentTab = 'dashboard';
 
 async function updateDashboard() {
+    // Only update dashboard elements if tab is active
+    if (currentTab !== 'dashboard') return;
+
     try {
         const [account, pnl, positions, activity, status, openOrders] = await Promise.all([
             fetch(`${API_BASE}/account`).then(r => r.json()),
@@ -27,6 +31,33 @@ async function updateDashboard() {
     }
 }
 
+async function updateHistory() {
+    try {
+        const orders = await fetch(`${API_BASE}/history`).then(r => r.json());
+        renderHistoryTable(orders);
+    } catch (e) {
+        console.error("History Fetch Error:", e);
+    }
+}
+
+function switchTab(tabName) {
+    currentTab = tabName;
+
+    // UI Toggle
+    document.querySelectorAll('.nav-tab').forEach(b => b.classList.remove('active'));
+    event.target.classList.add('active');
+
+    if (tabName === 'dashboard') {
+        document.getElementById('tab-dashboard').style.display = 'block';
+        document.getElementById('tab-history').style.display = 'none';
+        updateDashboard();
+    } else {
+        document.getElementById('tab-dashboard').style.display = 'none';
+        document.getElementById('tab-history').style.display = 'block';
+        updateHistory();
+    }
+}
+
 function updateHeader(status) {
     // Mode Badge
     const badge = document.getElementById("mode-badge");
@@ -44,6 +75,11 @@ function updateHeader(status) {
         dot.className = "status-dot";
         text.innerText = "IB Connection: DISCONNECTED";
     }
+
+    // Also update common metrics even if on history tab? 
+    // Usually keep header live. But updateDashboard skips.
+    // Let's allow updateDashboard to run partially or just sidebar?
+    // For simplicity, dashboard only updates when active.
 }
 
 function updateAccountMetrics(account, pnl) {
@@ -139,7 +175,7 @@ function renderPendingOrders(orders) {
     const container = document.getElementById("pending-orders-list");
     const badge = document.getElementById("pending-orders-badge");
 
-    if (!container || !badge) return; // Guard clause if HTML updated slowly
+    if (!container || !badge) return;
 
     badge.innerText = orders ? orders.length : 0;
     container.innerHTML = "";
@@ -151,8 +187,8 @@ function renderPendingOrders(orders) {
 
     orders.forEach(order => {
         const el = document.createElement("div");
-        el.className = "strategy-item"; // Reuse style for now
-        el.style.borderLeftColor = "#f59e0b"; // Orange/Yellow
+        el.className = "strategy-item";
+        el.style.borderLeftColor = "#f59e0b";
 
         el.innerHTML = `
             <div class="strat-info">
@@ -162,6 +198,32 @@ function renderPendingOrders(orders) {
             <button onclick="cancelOrder(${order.orderId})" style="background:var(--accent-red); border:none; color:white; padding:6px 12px; border-radius:4px; cursor:pointer; font-size:0.75rem;">Cancel</button>
         `;
         container.appendChild(el);
+    });
+}
+
+function renderHistoryTable(orders) {
+    const tbody = document.getElementById("history-table-body");
+    tbody.innerHTML = "";
+
+    if (!orders || orders.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:20px; color:#64748b;">No trades today</td></tr>`;
+        return;
+    }
+
+    orders.forEach(o => {
+        const row = document.createElement("tr");
+        const ts = new Date(o.created_at).toLocaleTimeString();
+        const statusColor = o.status === 'Filled' ? 'text-green' : (o.status === 'Cancelled' ? 'text-red' : '');
+
+        row.innerHTML = `
+            <td>${ts}</td>
+            <td style="font-weight:600; color:${o.action === 'buy' ? 'var(--accent-green)' : 'var(--accent-red)'}">${o.action.toUpperCase()}</td>
+            <td><b>${o.ticker}</b></td>
+            <td>${o.quantity}</td>
+            <td>${o.fill_price ? formatCurrency(o.fill_price) : '-'}</td>
+            <td class="${statusColor}">${o.status}</td>
+        `;
+        tbody.appendChild(row);
     });
 }
 
@@ -177,7 +239,7 @@ async function cancelOrder(orderId) {
         const data = await res.json();
         if (data.status === 'cancelled') {
             alert("Order Cancelled");
-            updateDashboard(); // Refresh immediately
+            updateDashboard();
         } else {
             alert("Failed to cancel: " + (data.error || "Unknown error"));
         }
@@ -261,4 +323,9 @@ function formatCurrency(num) {
 
 // Init
 updateDashboard();
-setInterval(updateDashboard, 3000);
+// Poll every 3 seconds for active content
+setInterval(() => {
+    if (currentTab === 'dashboard') {
+        updateDashboard();
+    }
+}, 3000);

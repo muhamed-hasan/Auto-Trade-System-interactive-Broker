@@ -93,59 +93,97 @@
 
             <!-- MIDDLE COLUMN: Active Positions & Strategies -->
             <section class="col-middle">
-                <!-- Positions Header -->
-                <div class="card-header" style="margin-bottom: 0;">
-                    <h3 class="card-title"><i data-lucide="layers" width="18" style="margin-right:8px;"></i> Open
-                        Positions</h3>
-                    <span class="mode-badge" style="background:#334155; color:#f8fafc;" id="pos-count-badge">0
-                        Active</span>
+
+                <div class="nav-tabs">
+                    <button class="nav-tab active" onclick="switchTab('dashboard')">Dashboard</button>
+                    <button class="nav-tab" onclick="switchTab('history')">Trade History</button>
                 </div>
 
-                <!-- Positions List -->
-                <div id="positions-container">
-                    <!-- Dynamic Positions Inserted Here -->
-                    <!-- Placeholder if empty -->
-                    <div style="text-align:center; padding: 40px; color: #64748b;">
-                        No active positions
+                <div id="tab-dashboard">
+                    <!-- Positions Header -->
+                    <div class="card-header" style="margin-bottom: 0;">
+                        <h3 class="card-title"><i data-lucide="layers" width="18" style="margin-right:8px;"></i> Open
+                            Positions</h3>
+                        <span class="mode-badge" style="background:#334155; color:#f8fafc;" id="pos-count-badge">0
+                            Active</span>
                     </div>
-                </div>
 
-                <!-- Pending Orders -->
-                <div class="card-header" style="margin-top: 20px; margin-bottom: 12px;">
-                    <h3 class="card-title"><i data-lucide="clock" width="18" style="margin-right:8px;"></i> Pending
-                        Orders</h3>
-                    <span class="mode-badge" style="background:#334155; color:#f8fafc;"
-                        id="pending-orders-badge">0</span>
-                </div>
-
-                <div id="pending-orders-list" class="strategy-list">
-                    <div style="text-align:center; padding: 20px; color: #64748b;">No pending orders</div>
-                </div>
-
-                <!-- Active Strategies -->
-                <div class="card-header" style="margin-top: 20px; margin-bottom: 12px;">
-                    <h3 class="card-title"><i data-lucide="cpu" width="18" style="margin-right:8px;"></i> Active
-                        Strategies</h3>
-                    <button
-                        style="background:var(--accent-blue); border:none; color:white; padding:4px 8px; border-radius:4px; cursor:pointer; font-size:0.75rem;">Add
-                        Strategy</button>
-                </div>
-
-                <div class="strategy-list">
-                    <!-- Static for now, dynamic in future -->
-                    <div class="strategy-item running">
-                        <div class="strat-info">
-                            <h4>Telegram Signal Listener</h4>
-                            <p>Monitoring Channel @Signals</p>
+                    <!-- Positions List -->
+                    <div id="positions-container">
+                        <!-- Dynamic Positions Inserted Here -->
+                        <!-- Placeholder if empty -->
+                        <div style="text-align:center; padding: 40px; color: #64748b;">
+                            No active positions
                         </div>
-                        <div class="strat-status status-running">RUNNING</div>
                     </div>
-                    <div class="strategy-item idle">
-                        <div class="strat-info">
-                            <h4>Mean Reversion</h4>
-                            <p>Waiting for setup</p>
+
+                    <!-- Pending Orders -->
+                    <div class="card-header" style="margin-top: 20px; margin-bottom: 12px;">
+                        <h3 class="card-title"><i data-lucide="clock" width="18" style="margin-right:8px;"></i> Pending
+                            Orders</h3>
+                        <span class="mode-badge" style="background:#334155; color:#f8fafc;"
+                            id="pending-orders-badge">0</span>
+                    </div>
+
+                    <div id="pending-orders-list" class="strategy-list">
+                        <div style="text-align:center; padding: 20px; color: #64748b;">No pending orders</div>
+                    </div>
+
+                    <!-- Active Strategies -->
+                    <div class="card-header" style="margin-top: 20px; margin-bottom: 12px;">
+                        <h3 class="card-title"><i data-lucide="cpu" width="18" style="margin-right:8px;"></i> Active
+                            Strategies</h3>
+                        <button
+                            style="background:var(--accent-blue); border:none; color:white; padding:4px 8px; border-radius:4px; cursor:pointer; font-size:0.75rem;">Add
+                            Strategy</button>
+                    </div>
+
+                    <div class="strategy-list">
+                        <!-- Static for now, dynamic in future -->
+                        <div class="strategy-item running">
+                            <div class="strat-info">
+                                <h4>Telegram Signal Listener</h4>
+                                <p>Monitoring Channel @Signals</p>
+                            </div>
+                            <div class="strat-status status-running">RUNNING</div>
                         </div>
-                        <div class="strat-status status-idle">IDLE</div>
+                        <div class="strategy-item idle">
+                            <div class="strat-info">
+                                <h4>Mean Reversion</h4>
+                                <p>Waiting for setup</p>
+                            </div>
+                            <div class="strat-status status-idle">IDLE</div>
+                        </div>
+                    </div>
+
+                </div> <!-- End Dashboard Tab -->
+
+                <div id="tab-history" style="display:none;">
+                    <div class="card-header">
+                        <h3 class="card-title"><i data-lucide="history" width="18" style="margin-right:8px;"></i>
+                            Today's Trades</h3>
+                        <button onclick="updateHistory()"
+                            style="background:none; border:none; color:var(--text-secondary); cursor:pointer;"><i
+                                data-lucide="refresh-cw" width="14"></i></button>
+                    </div>
+                    <div class="card" style="padding:0;">
+                        <table class="simple-table">
+                            <thead>
+                                <tr>
+                                    <th>Time</th>
+                                    <th>Action</th>
+                                    <th>Ticker</th>
+                                    <th>Qty</th>
+                                    <th>Price</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="history-table-body">
+                                <tr>
+                                    <td colspan="6" style="text-align:center; padding:20px;">Loading...</td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
 

@@ -1,6 +1,7 @@
 # AutoTrade System 🤖📈
 
 AutoTrade is a robust, asynchronous automated trading bot designed to execute trading signals received via Telegram directly to Interactive Brokers (IBKR). It features a unified Telegram interface for both signal listening and system control, ensuring seamless operation and real-time management.
+![Uploading image.png…]()
 
 ## 🚀 Key Features
 

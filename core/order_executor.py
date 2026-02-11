@@ -132,7 +132,9 @@ class OrderExecutor:
                         break
                 
                 if position_size > 0:
-                    return int(position_size * pct)
+                    qty = int(position_size * pct)
+                    logger.info(f"Calculated SELL qty for {signal.ticker}: {qty} shares ({pct*100}% of {position_size})")
+                    return qty
                 else:
                     logger.warning(f"No position found for {signal.ticker} to sell")
                     return 0

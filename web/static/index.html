@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AutoTrade Professional</title>
+    <link rel="stylesheet" href="/static/index.css">
+    <script src="https://cdn.jsdelivr.net/npm/lucide@latest"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Dashboard Header -->
+        <header class="top-bar">
+            <div class="logo-area">
+                <div class="logo-icon">EA</div>
+                <div class="logo-text">AutoTrade</div>
+            </div>
+            <div class="status-bar">
+                <span id="mode-badge" class="mode-badge">PAPER TRADING</span>
+                <span class="connection-status">
+                    <span id="ib-status-dot" class="status-dot"></span>
+                    <span id="ib-status-text">IB Connection: Checking...</span>
+                </span>
+                <div style="width: 32px; height: 32px; background: #334155; border-radius: 50%;"></div>
+            </div>
+        </header>
+
+        <!-- Main Dashboard Grid -->
+        <main class="dashboard-grid">
+
+            <!-- LEFT COLUMN: Account & Market Stats -->
+            <section class="col-left">
+                <!-- Total Equity -->
+                <div class="card value-display">
+                    <div class="card-header">
+                        <span class="value-label">Total Equity</span>
+                        <i data-lucide="wallet" class="card-icon"></i>
+                    </div>
+                    <div class="value-number" id="equity-val">$0.00</div>
+                    <div class="value-sub positive">
+                        <i data-lucide="trending-up" width="14"></i>
+                        <span id="pnl-percent-today">+0.00% Today</span>
+                    </div>
+                </div>
+
+                <!-- Buying Power -->
+                <div class="card value-display">
+                    <div class="card-header">
+                        <span class="value-label">Buying Power</span>
+                        <i data-lucide="zap" class="card-icon"></i>
+                    </div>
+                    <div class="value-number" id="bp-val">$0.00</div>
+                    <div class="progress-container">
+                        <div class="progress-bar" id="bp-progress" style="width: 0%"></div>
+                    </div>
+                    <div class="utilization-text"><span id="bp-util">0</span>% Utilized</div>
+                </div>
+
+                <!-- Daily P&L -->
+                <div class="card value-display">
+                    <div class="card-header">
+                        <span class="value-label">Daily P&L</span>
+                        <i data-lucide="bar-chart-2" class="card-icon"></i>
+                    </div>
+                    <div class="value-number text-green" id="daily-pnl-total">+$0.00</div>
+                    <div class="pnl-grid">
+                        <div class="pnl-box">
+                            <div class="pnl-box-label">REALIZED</div>
+                            <div class="pnl-box-value text-green" id="pnl-realized">+$0.00</div>
+                        </div>
+                        <div class="pnl-box">
+                            <div class="pnl-box-label">UNREALIZED</div>
+                            <div class="pnl-box-value text-green" id="pnl-unrealized">+$0.00</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Market Status -->
+                <div class="card market-status-card">
+                    <div class="card-header">
+                        <div class="card-title text-accent-blue">MARKET OPEN</div>
+                        <span class="market-indicator status-dot active"></span>
+                    </div>
+                    <div class="value-label" style="margin: 0;">Regular Trading Hours</div>
+                    <div class="value-sub" style="padding:0; margin-top: 4px; color: #94a3b8; background:none;">
+                        Next Close: 16:00 EST
+                    </div>
+                </div>
+            </section>
+
+            <!-- MIDDLE COLUMN: Active Positions & Strategies -->
+            <section class="col-middle">
+                <!-- Positions Header -->
+                <div class="card-header" style="margin-bottom: 0;">
+                    <h3 class="card-title"><i data-lucide="layers" width="18" style="margin-right:8px;"></i> Open
+                        Positions</h3>
+                    <span class="mode-badge" style="background:#334155; color:#f8fafc;" id="pos-count-badge">0
+                        Active</span>
+                </div>
+
+                <!-- Positions List -->
+                <div id="positions-container">
+                    <!-- Dynamic Positions Inserted Here -->
+                    <!-- Placeholder if empty -->
+                    <div style="text-align:center; padding: 40px; color: #64748b;">
+                        No active positions
+                    </div>
+                </div>
+
+                <!-- Pending Orders -->
+                <div class="card-header" style="margin-top: 20px; margin-bottom: 12px;">
+                    <h3 class="card-title"><i data-lucide="clock" width="18" style="margin-right:8px;"></i> Pending
+                        Orders</h3>
+                    <span class="mode-badge" style="background:#334155; color:#f8fafc;"
+                        id="pending-orders-badge">0</span>
+                </div>
+
+                <div id="pending-orders-list" class="strategy-list">
+                    <div style="text-align:center; padding: 20px; color: #64748b;">No pending orders</div>
+                </div>
+
+                <!-- Active Strategies -->
+                <div class="card-header" style="margin-top: 20px; margin-bottom: 12px;">
+                    <h3 class="card-title"><i data-lucide="cpu" width="18" style="margin-right:8px;"></i> Active
+                        Strategies</h3>
+                    <button
+                        style="background:var(--accent-blue); border:none; color:white; padding:4px 8px; border-radius:4px; cursor:pointer; font-size:0.75rem;">Add
+                        Strategy</button>
+                </div>
+
+                <div class="strategy-list">
+                    <!-- Static for now, dynamic in future -->
+                    <div class="strategy-item running">
+                        <div class="strat-info">
+                            <h4>Telegram Signal Listener</h4>
+                            <p>Monitoring Channel @Signals</p>
+                        </div>
+                        <div class="strat-status status-running">RUNNING</div>
+                    </div>
+                    <div class="strategy-item idle">
+                        <div class="strat-info">
+                            <h4>Mean Reversion</h4>
+                            <p>Waiting for setup</p>
+                        </div>
+                        <div class="strat-status status-idle">IDLE</div>
+                    </div>
+                </div>
+
+            </section>
+
+            <!-- RIGHT COLUMN: Holdings & Logs -->
+            <section class="col-right">
+                <!-- Portfolio Holdings Table -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title"><i data-lucide="pie-chart" width="18" style="margin-right:8px;"></i>
+                            Portfolio Holdings</h3>
+                    </div>
+                    <table class="simple-table">
+                        <thead>
+                            <tr>
+                                <th>Symbol</th>
+                                <th style="text-align:right">Qty</th>
+                                <th style="text-align:right">Avg Cost</th>
+                                <th style="text-align:right">Value</th>
+                            </tr>
+                        </thead>
+                        <tbody id="holdings-table-body">
+                            <!-- Dynamic Content -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- System Logs -->
+                <div class="card" style="flex-grow: 1;">
+                    <div class="card-header">
+                        <h3 class="card-title"><i data-lucide="terminal" width="18" style="margin-right:8px;"></i>
+                            System Logs</h3>
+                        <div class="status-dot active"></div>
+                    </div>
+                    <div class="logs-container" id="logs-feed">
+                        <!-- Dynamic Logs -->
+                        <div class="log-entry">
+                            <span class="log-time">[System]</span>
+                            <span class="log-msg">Dashboard initialized.</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+    <script src="/static/app.js"></script>
+    <script>
+        lucide.createIcons();
+    </script>
+</body>
+
+</html>

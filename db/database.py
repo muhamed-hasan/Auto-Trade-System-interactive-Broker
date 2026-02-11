@@ -161,3 +161,17 @@ class Database:
                 (key, str(value), datetime.now())
             )
             await db.commit()
+
+    async def get_recent_signals(self, limit: int = 50):
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute("SELECT * FROM signals ORDER BY id DESC LIMIT ?", (limit,)) as cursor:
+                rows = await cursor.fetchall()
+                return [dict(row) for row in rows]
+
+    async def get_recent_orders(self, limit: int = 50):
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute("SELECT * FROM orders ORDER BY id DESC LIMIT ?", (limit,)) as cursor:
+                rows = await cursor.fetchall()
+                return [dict(row) for row in rows]

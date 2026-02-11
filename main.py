@@ -8,6 +8,7 @@ from core.order_executor import OrderExecutor
 from core.trade_logger import TradeLogger
 from core.pnl_engine import PnLEngine
 from bots.trading_bot import UnifiedBot
+from web.server import WebServer
 
 # Configure logging
 logging.basicConfig(
@@ -41,11 +42,15 @@ async def main():
         logger.critical(f"Expected IB connection failure during development if Gateway not running: {e}")
         pass
 
+
     # 4. Attach Loggers & Engines
     trade_logger = TradeLogger(db, order_executor)
     pnl_engine = PnLEngine(db, order_executor)
     
-    # 5. Initialize Unified Bot
+    # 5. Initialize Web Server
+    web_server = WebServer(db, order_executor, pnl_engine)
+
+    # 6. Initialize Unified Bot
     # Using SIGNAL_BOT_TOKEN as the primary. Usually they are the same.
     token = settings.TELEGRAM_SIGNAL_BOT_TOKEN
     if not token:
@@ -60,8 +65,9 @@ async def main():
         db=db
     )
 
-    # 6. Start Services
+    # 7. Start Services
     try:
+        await web_server.start() # Start Web Dashboard
         await trading_bot.start()
         
         logger.info("System Online. Press Ctrl+C to stop.")
@@ -87,6 +93,8 @@ async def main():
     finally:
         logger.info("Shutting down...")
         await trading_bot.stop()
+        if 'web_server' in locals():
+            await web_server.stop()
 
 if __name__ == "__main__":
     try:

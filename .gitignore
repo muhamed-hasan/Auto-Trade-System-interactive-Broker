@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual Environment
+venv/
+env/
+.env
+
+# Database
+*.db
+*.sqlite3
+
+# Logs
+*.log
+logs/
+
+# IDE Settings
+.idea/
+.vscode/
+*.swp
+
+# OS System Files
+.DS_Store
+Thumbs.db
+
+# Project Specific
+training_data/
+checkpoints/
+__pycache__/

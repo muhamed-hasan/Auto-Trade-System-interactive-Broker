@@ -260,3 +260,6 @@ This software is for educational purposes only. Do not risk money which you are 
 
 هذا البرنامج للأغراض التعليمية فقط. لا تخاطر بأموال لا يمكنك تحمل خسارتها. استخدامك لهذا البرنامج هو على مسؤوليتك الخاصة. المطورون والمساهمون لا يتحملون أي مسؤولية عن نتائج تداولك.
 # Auto-Trade-System-interactive-Broker-
+# Auto-Trade-System-interactive-Broker
+# Auto-Trade-System-interactive-Broker
+# Auto-Trade-System-interactive-Broker

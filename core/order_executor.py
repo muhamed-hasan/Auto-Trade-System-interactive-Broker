@@ -171,8 +171,55 @@ class OrderExecutor:
             await self.connect()
             tags = await self.ib.accountSummaryAsync()
 
-        summary = {t.tag: float(t.value) for t in tags if t.tag in ['NetLiquidation', 'BuyingPower', 'TotalCashValue']}
+        # Log all available tags for debugging
+        logger.info(f"Available account summary tags: {[t.tag for t in tags]}")
+        
+        summary = {t.tag: float(t.value) for t in tags if t.tag in ['NetLiquidation', 'BuyingPower', 'TotalCashValue', 'UnrealizedPnL', 'RealizedPnL', 'DailyPnL']}
         return summary
+
+    async def get_daily_pnl(self) -> dict:
+        """
+        Get today's P&L using IB's reqPnL API.
+        Returns dict with dailyPnL, unrealizedPnL, and realizedPnL.
+        """
+        if not self.ib.isConnected():
+            await self.connect()
+        
+        # Get account number
+        accounts = self.ib.managedAccounts()
+        if accounts:
+            account = accounts[0] if isinstance(accounts, list) else accounts.split(',')[0]
+        else:
+            account = ""
+        
+        if not account:
+            logger.error("No account found for PnL request")
+            return {"dailyPnL": 0.0, "unrealizedPnL": 0.0, "realizedPnL": 0.0}
+        
+        try:
+            # Subscribe to PnL updates (if not already subscribed)
+            pnl_obj = self.ib.reqPnL(account)
+            
+            # Wait briefly for the data to arrive
+            await asyncio.sleep(0.5)
+            
+            # Get the latest PnL data
+            pnl_list = self.ib.pnl(account)
+            
+            if pnl_list:
+                pnl = pnl_list[0]
+                return {
+                    "dailyPnL": float(pnl.dailyPnL) if pnl.dailyPnL else 0.0,
+                    "unrealizedPnL": float(pnl.unrealizedPnL) if pnl.unrealizedPnL else 0.0,
+                    "realizedPnL": float(pnl.realizedPnL) if pnl.realizedPnL else 0.0
+                }
+            else:
+                logger.warning("No PnL data available")
+                return {"dailyPnL": 0.0, "unrealizedPnL": 0.0, "realizedPnL": 0.0}
+        
+        except Exception as e:
+            logger.error(f"Error getting daily PnL: {e}")
+            return {"dailyPnL": 0.0, "unrealizedPnL": 0.0, "realizedPnL": 0.0}
 
     async def get_all_positions(self):
         if not self.ib.isConnected():

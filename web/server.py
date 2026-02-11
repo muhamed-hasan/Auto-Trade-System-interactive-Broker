@@ -56,15 +56,38 @@ class WebServer:
     async def handle_positions(self, request):
         try:
             positions = await self.executor.get_all_positions()
+            
+            # Get portfolio items which include market prices
+            portfolio = self.executor.ib.portfolio()
+            
+            # Create a lookup dict by symbol
+            portfolio_map = {item.contract.symbol: item for item in portfolio}
+            
             # Convert IB Position objects to dicts
             pos_list = []
             for p in positions:
+                symbol = p.contract.symbol
+                
+                # Get portfolio item for this position
+                portfolio_item = portfolio_map.get(symbol)
+                
+                if portfolio_item:
+                    market_price = portfolio_item.marketPrice
+                    market_value = portfolio_item.marketValue
+                    unrealized_pnl = portfolio_item.unrealizedPNL
+                else:
+                    # Fallback if not in portfolio
+                    market_price = p.avgCost
+                    market_value = p.position * p.avgCost
+                    unrealized_pnl = 0.0
+                
                 pos_list.append({
-                    "symbol": p.contract.symbol,
+                    "symbol": symbol,
                     "position": p.position,
                     "avg_cost": p.avgCost,
-                    "market_price": 0, # TODO: We'd need to fetch live price for full PnL here, skip for now or use PnL engine
-                    "market_value": 0 
+                    "market_price": market_price,
+                    "market_value": market_value,
+                    "unrealized_pnl": unrealized_pnl
                 })
             return web.json_response(pos_list)
         except Exception as e:
@@ -73,6 +96,8 @@ class WebServer:
 
     async def handle_pnl(self, request):
         try:
+            # Update P&L from IB before returning
+            await self.pnl_engine.update()
             pnl_data = self.pnl_engine.current_pnl
             return web.json_response(pnl_data)
         except Exception as e:

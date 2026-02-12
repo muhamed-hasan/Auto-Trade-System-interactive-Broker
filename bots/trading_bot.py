@@ -135,7 +135,7 @@ class UnifiedBot:
         summary = await self.executor.get_account_summary()
         positions = await self.executor.get_all_positions()
         
-        approved, reason = self.risk_engine.evaluate(signal, summary, positions or [])
+        approved, reason = await self.risk_engine.evaluate(signal, summary, positions or [])
         
         if not approved:
             await self.db.update_signal_status(signal_id, f"rejected: {reason}")

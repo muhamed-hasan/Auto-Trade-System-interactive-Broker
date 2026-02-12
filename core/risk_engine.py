@@ -8,18 +8,19 @@ from config import settings
 logger = logging.getLogger(__name__)
 
 class RiskEngine:
-    def __init__(self):
+    def __init__(self, order_executor):
+        self.order_executor = order_executor
         # Cache for duplicate signal check: {(ticker, action): timestamp}
         self.recent_signals = {}
     
-    def evaluate(self, signal: Signal, account_summary: dict, open_positions: List) -> Tuple[bool, str]:
+    async def evaluate(self, signal: Signal, account_summary: dict, open_positions: List) -> Tuple[bool, str]:
         """
         Evaluates a signal against risk rules.
         Returns (approved, reason).
         """
         
         # 1. Trading Hours
-        if not self._is_market_open():
+        if not await self._is_market_open():
              if settings.TRADING_MODE != 'paper': # Allow off-hours in paper? Maybe.
                  return False, "Market is closed"
 
@@ -50,12 +51,15 @@ class RiskEngine:
         
         return True, "Approved"
 
-    def _is_market_open(self) -> bool:
-        # Simple check based on settings (UTC)
-        # TODO: Use IB contract details for improved accuracy
-        now = datetime.now(timezone.utc)
-        current_hour = now.hour
-        return settings.MARKET_OPEN_HOUR <= current_hour < settings.MARKET_CLOSE_HOUR
+    async def _is_market_open(self) -> bool:
+        # Check specific market status from IB
+        status = await self.order_executor.get_market_status()
+        if status.get("status") == "open":
+            return True
+        
+        # Log reason if closed
+        logger.info(f"Market closed: {status.get('reason')}")
+        return False
 
     def _is_duplicate(self, signal: Signal) -> bool:
         key = (signal.ticker, signal.action)

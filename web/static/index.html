@@ -81,12 +81,13 @@
                 <!-- Market Status -->
                 <div class="card market-status-card">
                     <div class="card-header">
-                        <div class="card-title text-accent-blue">MARKET OPEN</div>
-                        <span class="market-indicator status-dot active"></span>
+                        <div class="card-title text-accent-blue" id="market-status-title">MARKET CHECK</div>
+                        <span class="market-indicator status-dot" id="market-status-dot"></span>
                     </div>
-                    <div class="value-label" style="margin: 0;">Regular Trading Hours</div>
-                    <div class="value-sub" style="padding:0; margin-top: 4px; color: #94a3b8; background:none;">
-                        Next Close: 16:00 EST
+                    <div class="value-label" style="margin: 0;" id="market-status-text">Checking...</div>
+                    <div class="value-sub" style="padding:0; margin-top: 4px; color: #94a3b8; background:none;"
+                        id="market-status-sub">
+                        --:--
                     </div>
                 </div>
             </section>

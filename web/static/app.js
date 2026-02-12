@@ -78,8 +78,30 @@ function updateHeader(status) {
 
     // Also update common metrics even if on history tab? 
     // Usually keep header live. But updateDashboard skips.
-    // Let's allow updateDashboard to run partially or just sidebar?
     // For simplicity, dashboard only updates when active.
+
+    // Market Status
+    const mktTitle = document.getElementById("market-status-title");
+    const mktDot = document.getElementById("market-status-dot");
+    const mktText = document.getElementById("market-status-text");
+    const mktSub = document.getElementById("market-status-sub");
+
+    if (status.market_status) {
+        const isOpen = status.market_status.status === 'open';
+        mktTitle.innerText = isOpen ? "MARKET OPEN" : "MARKET CLOSED";
+
+        // Update dot class
+        mktDot.className = isOpen ? "market-indicator status-dot active" : "market-indicator status-dot";
+        // Optionally change title color
+        mktTitle.className = isOpen ? "card-title text-green" : "card-title text-gray";
+
+        // Truncate long reason text if needed
+        let reason = status.market_status.reason || (isOpen ? "Trading Active" : "Trading Halted");
+        if (reason.length > 50) reason = reason.substring(0, 47) + "...";
+        mktText.innerText = reason;
+
+        mktSub.innerText = "Source: " + (status.market_status.source || "Unknown");
+    }
 }
 
 function updateAccountMetrics(account, pnl) {

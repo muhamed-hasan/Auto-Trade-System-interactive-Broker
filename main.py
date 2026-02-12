@@ -32,8 +32,8 @@ async def main():
     await db.init_db()
     
     # 2. Key Components
-    risk_engine = RiskEngine()
     order_executor = OrderExecutor()
+    risk_engine = RiskEngine(order_executor)
     
     # 3. Connect to IB
     try:

@@ -1,5 +1,7 @@
 import asyncio
 import logging
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 from ib_insync import IB, Stock, MarketOrder, LimitOrder, Trade as IBTrade
 from db.models import Signal, Order
 from config import settings
@@ -302,3 +304,129 @@ class OrderExecutor:
             action = 'SELL' if pos.position > 0 else 'BUY'
             order = MarketOrder(action, abs(pos.position))
             self.ib.placeOrder(contract, order)
+
+    async def get_market_status(self):
+        """
+        Check if the market is open using SPY contract details.
+        Returns a dict with status ('open', 'closed', 'error') and reasoning.
+        """
+        if not self.ib.isConnected():
+             # Fallback to settings check if not connected, or return unknown
+            now = datetime.now(timezone.utc)
+            is_open = settings.MARKET_OPEN_HOUR <= now.hour < settings.MARKET_CLOSE_HOUR
+            return {
+                "status": "open" if is_open else "closed", 
+                "reason": "Not connected to IB, using local settings",
+                "source": "local"
+            }
+            
+        try:
+            contract = Stock('SPY', 'SMART', 'USD')
+            details_list = await self.ib.reqContractDetailsAsync(contract)
+            if not details_list:
+                return {"status": "unknown", "reason": "No contract details for SPY", "source": "ib"}
+                
+            details = details_list[0]
+            # liquidHours format: 20231027:0930-1600;20231028:CLOSED
+            liquid_hours = details.liquidHours
+            time_zone_id = details.timeZoneId
+            
+            # IB uses specific timezone IDs, usually standardized
+            try:
+                tz = ZoneInfo(time_zone_id)
+            except Exception:
+                tz = ZoneInfo('US/Eastern') # Fallback
+                
+            now = datetime.now(tz)
+            today_str = now.strftime('%Y%m%d')
+            
+            hours_list = liquid_hours.split(';')
+            today_hours = None
+            for h in hours_list:
+                if h.startswith(today_str):
+                    today_hours = h
+                    break
+            
+            if not today_hours:
+                 return {"status": "closed", "reason": "No hours found for today", "source": "ib"}
+                 
+            if "CLOSED" in today_hours:
+                 return {"status": "closed", "reason": "Market Closed Today", "source": "ib"}
+                 
+            # Parse intervals: date:0930-1600,1615-1700
+            # Remove date part
+            # Parse intervals. today_hours example: "20260211:0930-20260211:1600" or "20231027:0930-1600"
+            # Strategy: Split by comma (if multiple intervals), then split by hyphen.
+            # Then parse each side.
+            
+            # First, strip the leading date if it exists in the simplified "Date:Intervals" format
+            # But since we saw "Date:Time-Date:Time", simply splitting on first colon might be misleading if the first part is just one side of a range?
+            # actually, usually it is "Date:Range". If Range is "Time-Date:Time", splitting on first colon is "Date" and "Time-Date:Time".
+            # If Range is "Time-Time", split is "Date" and "Time-Time".
+            
+            # Let's try to remove all "YYYYMMDD:" prefixes to simplify? No, we need dates for accuracy.
+            
+            # Let's go back to looking at the substring AFTER the first colon, OR just parsing the full chunks if they look like dates.
+            # However, `liquidHours` is semi-colon separated `Date:Ranges`.
+            # So `today_hours` ensures we are looking at the chunk for today.
+            
+            # Split on the first colon to separate the "Date" key from the "Ranges".
+            try:
+                parts = today_hours.split(':', 1)
+                if len(parts) == 2:
+                    current_intervals_str = parts[1]
+                else:
+                    # Maybe it's just "CLOSED"? Handled above.
+                    current_intervals_str = today_hours
+
+                intervals = current_intervals_str.split(',')
+                
+                is_open = False
+                
+                def parse_dt(dt_str, default_date_str):
+                    # dt_str can be "HHMM" or "YYYYMMDD:HHMM"
+                    if ':' in dt_str:
+                        d_str, t_str = dt_str.split(':')
+                        return now.replace(year=int(d_str[:4]), month=int(d_str[4:6]), day=int(d_str[6:8]), 
+                                         hour=int(t_str[:2]), minute=int(t_str[2:]), second=0, microsecond=0)
+                    else:
+                        # Use default date
+                        return now.replace(year=int(default_date_str[:4]), month=int(default_date_str[4:6]), day=int(default_date_str[6:8]), 
+                                         hour=int(dt_str[:2]), minute=int(dt_str[2:]), second=0, microsecond=0)
+
+                # We need the date part from the key for defaults
+                default_date_str = parts[0] if len(parts) == 2 else today_str
+
+                readable_intervals = []
+                for interval in intervals:
+                    if '-' not in interval: continue
+                    start_str, end_str = interval.split('-')
+                    
+                    start_dt = parse_dt(start_str, default_date_str)
+                    end_dt = parse_dt(end_str, default_date_str)
+                    
+                    # Store readable format
+                    readable_intervals.append(f"{start_dt.strftime('%H:%M')} - {end_dt.strftime('%H:%M')}")
+                    
+                    if start_dt <= now < end_dt:
+                        is_open = True
+                
+                # Format timezone name nicely
+                tz_name = now.tzname() or ""
+                reason_msg = f"Hours: {', '.join(readable_intervals)} ({tz_name})".strip()
+                        
+                return {
+                    "status": "open" if is_open else "closed", 
+                    "reason": reason_msg,
+                    "source": "ib"
+                }
+
+            except Exception as ve:
+                 logger.error(f"Error parsing time string '{today_hours}': {ve}")
+                 return {"status": "error", "reason": f"Parse Error: {ve}", "source": "error"}
+                    
+
+
+        except Exception as e:
+            logger.error(f"Error checking market status: {e}")
+            return {"status": "error", "reason": str(e), "source": "error"}

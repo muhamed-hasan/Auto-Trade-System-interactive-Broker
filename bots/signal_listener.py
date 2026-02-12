@@ -65,7 +65,7 @@ class SignalListenerBot:
         # But for accurate snapshot we might want reqPositionsAsync.
         # Let's assume executor.get_all_positions() is async and works.
         
-        approved, reason = self.risk_engine.evaluate(signal, summary, positions or [])
+        approved, reason = await self.risk_engine.evaluate(signal, summary, positions or [])
         
         if not approved:
             await self.db.update_signal_status(signal_id, f"rejected: {reason}")

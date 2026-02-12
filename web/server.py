@@ -150,10 +150,13 @@ class WebServer:
             trading_status = await self.db.get_system_state("trading_status") or "active"
             ib_connected = self.executor.ib.isConnected()
             
+            market_status = await self.executor.get_market_status()
+            
             return web.json_response({
                 "trading_status": trading_status,
                 "ib_connected": ib_connected,
-                "mode": settings.TRADING_MODE
+                "mode": settings.TRADING_MODE,
+                "market_status": market_status
             })
         except Exception as e:
             return web.json_response({"error": str(e)}, status=500)

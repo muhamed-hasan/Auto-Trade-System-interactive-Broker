@@ -23,7 +23,6 @@ async function updateDashboard() {
         updateAccountMetrics(account, pnl);
         renderPositionsList(positions);
         renderPendingOrders(openOrders);
-        renderHoldingsTable(positions);
         renderLogs(activity);
 
     } catch (e) {
@@ -157,16 +156,21 @@ function setPnLValue(id, val) {
 }
 
 function renderPositionsList(positions) {
-    const container = document.getElementById("positions-container");
+    const tbody = document.getElementById("positions-table-body");
+    const noPosMsg = document.getElementById("no-positions-msg");
     const badge = document.getElementById("pos-count-badge");
 
     badge.innerText = `${positions.length} Active`;
-    container.innerHTML = "";
+    tbody.innerHTML = "";
 
     if (positions.length === 0) {
-        container.innerHTML = `<div style="text-align:center; padding: 40px; color: #64748b;">No active positions</div>`;
+        noPosMsg.style.display = "block";
+        tbody.closest("table").style.display = "none";
         return;
     }
+
+    noPosMsg.style.display = "none";
+    tbody.closest("table").style.display = "table";
 
     positions.forEach(pos => {
         const mktPrice = pos.market_price || pos.avg_cost; // Fallback
@@ -175,46 +179,56 @@ function renderPositionsList(positions) {
         const pnl = marketVal - costBasis;
         const pnlPct = costBasis !== 0 ? (pnl / costBasis) * 100 : 0;
 
-        const card = document.createElement("div");
-        card.className = "card position-card";
-
         const isLong = pos.position > 0;
-        const side = isLong ? "LONG" : "SHORT";
         const colorClass = pnl >= 0 ? "text-green" : "text-red";
-        const bgClass = pnl >= 0 ? "bg-green-soft" : "bg-red-soft";
-        const arrow = pnl >= 0 ? "▲" : "▼";
 
-        card.innerHTML = `
-            <div class="pos-header">
-                <div class="pos-ticker-group">
-                    <div class="ticker-box">${pos.symbol}</div>
-                    <div>
-                        <div class="pos-name">${pos.symbol} Inc.</div>
-                        <div class="pos-side">${side} @ ${formatCurrency(pos.avg_cost)}</div>
-                    </div>
-                </div>
-                <div class="pos-pnl">
-                    <span class="pnl-amount ${colorClass}">${(pnl >= 0 ? "+" : "")}${formatCurrency(pnl)}</span>
-                    <span class="pnl-percent ${bgClass}">${arrow} ${pnlPct.toFixed(2)}%</span>
-                </div>
-            </div>
-            <div class="pos-stats">
-                <div class="stat-box">
-                    <span class="stat-label">Qty</span>
-                    <span class="stat-val">${pos.position}</span>
-                </div>
-                <div class="stat-box">
-                    <span class="stat-label">Last</span>
-                    <span class="stat-val">${formatCurrency(mktPrice)}</span>
-                </div>
-                <div class="stat-box">
-                    <span class="stat-label">Mkt Val</span>
-                    <span class="stat-val">${formatCurrency(marketVal)}</span>
-                </div>
-            </div>
+        const row = document.createElement("tr");
+        row.innerHTML = `
+            <td style="padding-left: 16px;">
+                <div style="font-weight:600;">${pos.symbol}</div>
+                <div style="font-size:0.7rem; color:var(--text-secondary);">${isLong ? 'LONG' : 'SHORT'}</div>
+            </td>
+            <td style="text-align:right">${pos.position}</td>
+            <td style="text-align:right">${formatCurrency(pos.avg_cost)}</td>
+            <td style="text-align:right">${formatCurrency(mktPrice)}</td>
+            <td style="text-align:right">
+                <div class="${colorClass}" style="font-weight:600;">${(pnl >= 0 ? "+" : "")}${formatCurrency(pnl)}</div>
+                <div class="${colorClass}" style="font-size:0.7rem;">${pnlPct.toFixed(2)}%</div>
+            </td>
+            <td style="text-align:right; font-weight:600;">${formatCurrency(marketVal)}</td>
+            <td style="text-align:right; padding-right: 16px;">
+                <button onclick="closePosition('${pos.symbol}')" 
+                    style="background:none; border:none; color:var(--accent-red); cursor:pointer; font-size:0.8rem; font-weight:600; padding:4px 8px; border-radius:4px;">
+                    Close
+                </button>
+            </td>
         `;
-        container.appendChild(card);
+        tbody.appendChild(row);
     });
+}
+
+async function closePosition(symbol) {
+    if (!confirm(`Are you sure you want to CLOSE your ${symbol} position?`)) return;
+
+    try {
+        const response = await fetch('/api/positions/close', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ symbol: symbol })
+        });
+        const result = await response.json();
+
+        if (result.status === 'closed') {
+            // Optimistically remove or reload
+            alert(`Close order submitted for ${symbol}`);
+            updateDashboard();
+        } else {
+            alert("Error: " + (result.error || "Unknown error"));
+        }
+    } catch (e) {
+        console.error(e);
+        alert("Failed to send close request");
+    }
 }
 
 function renderPendingOrders(orders) {
@@ -294,22 +308,7 @@ async function cancelOrder(orderId) {
     }
 }
 
-function renderHoldingsTable(positions) {
-    const tbody = document.getElementById("holdings-table-body");
-    tbody.innerHTML = "";
 
-    positions.forEach(pos => {
-        const val = pos.position * pos.avg_cost;
-        const row = document.createElement("tr");
-        row.innerHTML = `
-            <td><b>${pos.symbol}</b></td>
-            <td class="val-cell">${pos.position}</td>
-            <td class="val-cell">${formatCurrency(pos.avg_cost)}</td>
-            <td class="val-cell">${formatCurrency(val)}</td>
-        `;
-        tbody.appendChild(row);
-    });
-}
 
 function renderLogs(activity) {
     const logsContainer = document.getElementById("logs-feed");

@@ -583,6 +583,25 @@ body {
     gap: 20px;
 }
 
+.close-pos-btn {
+    width: 100%;
+    margin-top: 12px;
+    padding: 10px;
+    border: none;
+    background: var(--accent-red);
+    color: white;
+    font-weight: 600;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    font-size: 0.85rem;
+}
+
+.close-pos-btn:hover {
+    background: #dc2626;
+    /* Darker red */
+}
+
 .ticker-item {
     font-size: 0.85rem;
     font-weight: 600;

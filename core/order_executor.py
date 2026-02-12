@@ -383,6 +383,27 @@ class OrderExecutor:
             order = MarketOrder(action, abs(pos.position))
             self.ib.placeOrder(contract, order)
 
+    async def close_position(self, symbol: str):
+        """Close a specific position by symbol"""
+        if not self.ib.isConnected():
+             await self.connect()
+             
+        positions = await self.get_all_positions()
+        for pos in positions:
+            if pos.contract.symbol == symbol:
+                contract = pos.contract
+                # Inverse action to close
+                action = 'SELL' if pos.position > 0 else 'BUY'
+                quantity = abs(pos.position)
+                
+                logger.info(f"Closing position for {symbol}: {action} {quantity}")
+                order = MarketOrder(action, quantity)
+                trade = self.ib.placeOrder(contract, order)
+                return True
+        
+        logger.warning(f"No open position found for {symbol} to close.")
+        return False
+
     async def get_market_status(self):
         """
         Check if the market is open using SPY contract details.

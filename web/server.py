@@ -22,6 +22,7 @@ class WebServer:
         # API Routes
         self.app.router.add_get('/api/account', self.handle_account)
         self.app.router.add_get('/api/positions', self.handle_positions)
+        self.app.router.add_post('/api/positions/close', self.handle_close_position)
         self.app.router.add_get('/api/pnl', self.handle_pnl)
         self.app.router.add_get('/api/activity', self.handle_activity)
         self.app.router.add_get('/api/orders/open', self.handle_open_orders)
@@ -81,6 +82,9 @@ class WebServer:
                     market_value = p.position * p.avgCost
                     unrealized_pnl = 0.0
                 
+                if p.position == 0:
+                    continue
+                    
                 pos_list.append({
                     "symbol": symbol,
                     "position": p.position,
@@ -137,6 +141,23 @@ class WebServer:
                 return web.json_response({"error": "Order not found or could not cancel"}, status=404)
         except Exception as e:
             return web.json_response({"error": str(e)}, status=500)
+
+    async def handle_close_position(self, request):
+        try:
+            data = await request.json()
+            symbol = data.get('symbol')
+            if not symbol:
+                return web.json_response({"error": "Missing symbol"}, status=400)
+            
+            success = await self.executor.close_position(symbol)
+            if success:
+                return web.json_response({"status": "closed", "symbol": symbol})
+            else:
+                return web.json_response({"error": f"Position for {symbol} not found or could not be closed"}, status=404)
+        except Exception as e:
+            logger.error(f"Error closing position: {e}")
+            return web.json_response({"error": str(e)}, status=500)
+
 
     async def handle_history(self, request):
         try:

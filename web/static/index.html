@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AutoTrade Professional</title>
-    <link rel="stylesheet" href="/static/index.css">
+    <link rel="stylesheet" href="/static/index.css?v=2">
     <script src="https://cdn.jsdelivr.net/npm/lucide@latest"></script>
     <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
 </head>
@@ -115,11 +115,26 @@
                             Active</span>
                     </div>
 
-                    <!-- Positions List -->
-                    <div id="positions-container">
-                        <!-- Dynamic Positions Inserted Here -->
-                        <!-- Placeholder if empty -->
-                        <div style="text-align:center; padding: 40px; color: #64748b;">
+                    <!-- Positions List (Table Layout) -->
+                    <div class="card" style="padding: 0; overflow: hidden; border: 1px solid var(--divider);">
+                        <table class="simple-table">
+                            <thead>
+                                <tr>
+                                    <th style="padding-left: 16px;">Symbol</th>
+                                    <th style="text-align:right">Qty</th>
+                                    <th style="text-align:right">Avg Cost</th>
+                                    <th style="text-align:right">Last</th>
+                                    <th style="text-align:right">P&L</th>
+                                    <th style="text-align:right">Value</th>
+                                    <th style="text-align:right; padding-right: 16px;">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="positions-table-body">
+                                <!-- Dynamic Positions Inserted Here -->
+                            </tbody>
+                        </table>
+                        <div id="no-positions-msg"
+                            style="text-align:center; padding: 20px; color: #64748b; display:none;">
                             No active positions
                         </div>
                     </div>
@@ -146,7 +161,6 @@
                     </div>
 
                     <div class="strategy-list">
-                        <!-- Static for now, dynamic in future -->
                         <div class="strategy-item running">
                             <div class="strat-info">
                                 <h4>Telegram Signal Listener</h4>
@@ -196,29 +210,8 @@
 
             </section>
 
-            <!-- RIGHT COLUMN: Holdings & Logs -->
+            <!-- RIGHT COLUMN: Logs Only -->
             <section class="col-right">
-                <!-- Portfolio Holdings Table -->
-                <div class="card">
-                    <div class="card-header">
-                        <h3 class="card-title"><i data-lucide="pie-chart" width="18" style="margin-right:8px;"></i>
-                            Portfolio Holdings</h3>
-                    </div>
-                    <table class="simple-table">
-                        <thead>
-                            <tr>
-                                <th>Symbol</th>
-                                <th style="text-align:right">Qty</th>
-                                <th style="text-align:right">Avg Cost</th>
-                                <th style="text-align:right">Value</th>
-                            </tr>
-                        </thead>
-                        <tbody id="holdings-table-body">
-                            <!-- Dynamic Content -->
-                        </tbody>
-                    </table>
-                </div>
-
                 <!-- System Logs -->
                 <div class="card" style="flex-grow: 1;">
                     <div class="card-header">

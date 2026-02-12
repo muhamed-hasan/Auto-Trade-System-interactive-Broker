@@ -27,9 +27,9 @@ TRADING_MODE = os.getenv("TRADING_MODE", "paper").lower()
 
 # --- Risk Management Settings ---
 MAX_RISK_PER_TRADE_PERCENT = 0.02  # 2% of equity
-MAX_OPEN_POSITIONS = 20
+MAX_OPEN_POSITIONS = 100
 MAX_DAILY_LOSS_PERCENT = 0.05      # 5% of daily starting equity accounts for a kill switch
-SYMBOL_COOLDOWN_SECONDS = 300      # 5 minutes cooldown between same-symbol trades
+SYMBOL_COOLDOWN_SECONDS = 1      # 5 minutes cooldown between same-symbol trades
 ORDER_THROTTLE_SECONDS = 60        # Max 1 order per minute per symbol? Or system wide? Let's say system wide check for burst.
 
 # --- Trading Hours (UTC) ---

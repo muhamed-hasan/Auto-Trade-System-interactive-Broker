@@ -33,7 +33,9 @@ class RiskEngine:
         # Allow closing orders (sell if we hold, buy if short)
         # For simplicity, assume 'buy' increases exposure, 'sell' decreases (long only for now)
         if signal.action == 'buy':
-            if len(open_positions) >= settings.MAX_OPEN_POSITIONS:
+            # Filter out positions with quantity 0 (closed positions)
+            active_positions = [p for p in open_positions if p.position != 0]
+            if len(active_positions) >= settings.MAX_OPEN_POSITIONS:
                 return False, f"Max open positions reached ({settings.MAX_OPEN_POSITIONS})"
 
         # 4. Buying Power Check

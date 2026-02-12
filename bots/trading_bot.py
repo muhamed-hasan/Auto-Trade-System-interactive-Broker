@@ -80,9 +80,11 @@ class UnifiedBot:
 
         elif data == 'positions':
             positions = await self.executor.get_all_positions()
-            if positions:
-                pos_text = "\n".join([f"{p.contract.symbol}: {p.position} @ {p.avgCost:.2f}" for p in positions])
-                msg = f"� **Open Positions**:\n{pos_text}"
+            # Filter out positions with quantity 0
+            active_positions = [p for p in positions if p.position != 0]
+            if active_positions:
+                pos_text = "\n".join([f"{p.contract.symbol}: {p.position} @ {p.avgCost:.2f}" for p in active_positions])
+                msg = f"📜 **Open Positions**:\n{pos_text}"
             else:
                 msg = "📜 **Open Positions**: None"
             await query.edit_message_text(msg)

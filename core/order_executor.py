@@ -275,6 +275,7 @@ class OrderExecutor:
         logger.info(f"Available account summary tags: {[t.tag for t in tags]}")
         
         summary = {t.tag: float(t.value) for t in tags if t.tag in ['NetLiquidation', 'BuyingPower', 'TotalCashValue', 'UnrealizedPnL', 'RealizedPnL', 'DailyPnL']}
+        logger.info(f"Account summary P&L values: RealizedPnL={summary.get('RealizedPnL', 'N/A')}, DailyPnL={summary.get('DailyPnL', 'N/A')}, UnrealizedPnL={summary.get('UnrealizedPnL', 'N/A')}")
         return summary
 
     async def get_daily_pnl(self) -> dict:
@@ -310,7 +311,7 @@ class OrderExecutor:
                     "unrealizedPnL": float(pnl.unrealizedPnL) if pnl.unrealizedPnL is not None else 0.0,
                     "realizedPnL": float(pnl.realizedPnL) if pnl.realizedPnL is not None else 0.0
                 }
-                logger.debug(f"PnL data: {result}")
+                logger.info(f"PnL data from IB API: {result}")
                 return result
             else:
                 logger.warning("No PnL data available from subscription")

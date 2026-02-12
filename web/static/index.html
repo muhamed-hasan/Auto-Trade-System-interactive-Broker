@@ -19,6 +19,12 @@
                 <div class="logo-text">AutoTrade</div>
             </div>
             <div class="status-bar">
+                <div class="market-ticker" id="market-ticker" style="display:none;">
+                    <span class="ticker-item">SPY <span id="spy-val" class="ticker-value">---</span></span>
+                    <span class="ticker-item" style="border-left: 1px solid #334155; padding-left: 20px;">VIX <span
+                            id="vix-val" class="ticker-value">---</span></span>
+                </div>
+                <div style="width: 1px; height: 24px; background: #334155; margin: 0 10px;"></div>
                 <span id="mode-badge" class="mode-badge">PAPER TRADING</span>
                 <span class="connection-status">
                     <span id="ib-status-dot" class="status-dot"></span>

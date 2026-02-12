@@ -575,3 +575,25 @@ body {
         overflow-y: auto;
     }
 }
+
+/* Market Ticker in Header */
+.market-ticker {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.ticker-item {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.ticker-value {
+    color: var(--text-primary);
+    font-family: 'Fira Code', monospace;
+    font-weight: 500;
+}

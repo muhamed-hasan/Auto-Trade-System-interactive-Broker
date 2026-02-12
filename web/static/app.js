@@ -102,6 +102,30 @@ function updateHeader(status) {
 
         mktSub.innerText = "Source: " + (status.market_status.source || "Unknown");
     }
+
+    // Market Indices
+    const tickerDiv = document.getElementById("market-ticker");
+    if (status.indices) {
+        tickerDiv.style.display = "flex";
+
+        const updateTicker = (id, data, isCurrency) => {
+            const el = document.getElementById(id);
+            if (!data || !data.value) {
+                el.innerText = "---";
+                return;
+            }
+            // User requested percentage change displayed
+            const val = data.change;
+            const sign = val >= 0 ? "+" : "";
+            const colorClass = val >= 0 ? "text-green" : "text-red";
+
+            // Format: "+0.52%"
+            el.innerHTML = `<span class="${colorClass}">${sign}${val.toFixed(2)}%</span>`;
+        };
+
+        updateTicker("spy-val", status.indices.SPY, true);
+        updateTicker("vix-val", status.indices.VIX, false);
+    }
 }
 
 function updateAccountMetrics(account, pnl) {

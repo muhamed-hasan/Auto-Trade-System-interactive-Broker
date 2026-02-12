@@ -2,7 +2,8 @@ import asyncio
 import logging
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
-from ib_insync import IB, Stock, MarketOrder, LimitOrder, Trade as IBTrade
+import math
+from ib_insync import IB, Stock, Index, MarketOrder, LimitOrder, Trade as IBTrade
 from db.models import Signal, Order
 from config import settings
 
@@ -14,6 +15,8 @@ class OrderExecutor:
         self.client_id = settings.IB_CLIENT_ID
         self._connected = False
         self._pnl_subscribed = False
+        self.spy_ticker = None
+        self.vix_ticker = None
 
     async def connect(self):
         """
@@ -29,9 +32,13 @@ class OrderExecutor:
                 )
                 self._connected = True
                 logger.info("Connected to IB.")
-                
+                # Set market data type to Delayed Frozen (4) to get data even if market closed/no sub
+                self.ib.reqMarketDataType(4)
+
                 # Subscribe to PnL updates
                 await self._subscribe_pnl()
+                # Subscribe to Market Indices
+                await self._subscribe_market_data()
                 
             except Exception as e:
                 logger.error(f"Failed to connect to IB: {e}")
@@ -52,6 +59,77 @@ class OrderExecutor:
                 logger.info(f"Subscribed to PnL updates for account {account}")
         except Exception as e:
             logger.error(f"Failed to subscribe to PnL: {e}")
+
+    async def _subscribe_market_data(self):
+        """Subscribe to SPY and VIX market data"""
+        try:
+            spy = Stock('SPY', 'SMART', 'USD')
+            vix = Index('VIX', 'CBOE')
+            
+            # Request market data (snapshot=False for streaming)
+            # We assign to self so we can access ticker.marketPrice() later
+            self.spy_ticker = self.ib.reqMktData(spy, '', False, False)
+            self.vix_ticker = self.ib.reqMktData(vix, '', False, False)
+            logger.info("Subscribed to SPY and VIX market data")
+        except Exception as e:
+            logger.error(f"Failed to subscribe to market data: {e}")
+
+    async def get_market_indices(self) -> dict:
+        """Get current prices for SPY and VIX"""
+        try:
+            # marketPrice() handles NaN/None gracefully usually returning last valid
+            if self.spy_ticker:
+                 spy_val = self.spy_ticker.marketPrice()
+            elif self.ib.isConnected():
+                 # Retry subscription if missing?
+                 spy = Stock('SPY', 'SMART', 'USD')
+                 self.spy_ticker = self.ib.reqMktData(spy, '', False, False)
+                 spy_val = 0.0
+            else:
+                 spy_val = 0.0
+
+            if self.vix_ticker:
+                 vix_val = self.vix_ticker.marketPrice()
+            elif self.ib.isConnected():
+                 vix = Index('VIX', 'CBOE')
+                 self.vix_ticker = self.ib.reqMktData(vix, '', False, False)
+                 vix_val = 0.0
+            else:
+                 vix_val = 0.0
+            
+            # Check for nan
+            
+            # Helper to extract price and change
+            def get_ticker_data(ticker):
+                if not ticker: 
+                    return {"value": 0.0, "change": 0.0}
+                
+                price = ticker.marketPrice()
+                # 'close' is previous day's closing price in ib_insync Ticker
+                prev_close = ticker.close
+                
+                if math.isnan(price): price = 0.0
+                if math.isnan(prev_close): prev_close = 0.0
+                
+                change_pct = 0.0
+                if price > 0 and prev_close > 0:
+                    change_pct = ((price - prev_close) / prev_close) * 100.0
+                    
+                return {"value": price, "change": change_pct}
+
+            spy_data = get_ticker_data(self.spy_ticker)
+            vix_data = get_ticker_data(self.vix_ticker)
+            
+            return {
+                "SPY": spy_data,
+                "VIX": vix_data
+            }
+        except Exception as e:
+            logger.error(f"Error getting indices: {e}")
+            return {
+                "SPY": {"value": 0.0, "change": 0.0}, 
+                "VIX": {"value": 0.0, "change": 0.0}
+            }
 
     async def execute_order(self, signal: Signal) -> IBTrade:
         """

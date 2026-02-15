@@ -29,3 +29,4 @@ Thumbs.db
 training_data/
 checkpoints/
 __pycache__/
+.agents/

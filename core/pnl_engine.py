@@ -53,7 +53,7 @@ class PnLEngine:
             date_str = datetime.now().strftime("%Y-%m-%d")
             await self.db.update_daily_pnl(date_str, realized, unrealized, trades_count)
             
-            logger.info(f"PnL Update: Daily Total={today_total:.2f} (Realized={realized:.2f}, Unrealized={unrealized:.2f}), Trades={trades_count}")
+            logger.debug(f"PnL Update: Daily Total={today_total:.2f} (Realized={realized:.2f}, Unrealized={unrealized:.2f}), Trades={trades_count}")
             
         except Exception as e:
             logger.error(f"Error updating PnL: {e}")

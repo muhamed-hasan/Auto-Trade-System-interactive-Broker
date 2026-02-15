@@ -11,17 +11,44 @@ from bots.trading_bot import UnifiedBot
 from web.server import WebServer
 
 # Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    filename='autoTrade.log',
-    filemode='a'
-)
-# Also output to console
-console = logging.StreamHandler()
-console.setLevel(logging.INFO)
-logging.getLogger('').addHandler(console)
+# Create a custom logger
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
 
+# 1. Console Handler - specific level (WARNING) to hide unimportant logs
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.WARNING)
+console_format = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+console_handler.setFormatter(console_format)
+logger.addHandler(console_handler)
+
+# 2. Main Log File - INFO level (detailed)
+file_handler = logging.FileHandler('autoTrade.log')
+file_handler.setLevel(logging.INFO)
+file_format = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+file_handler.setFormatter(file_format)
+logger.addHandler(file_handler)
+
+# 3. Error Log File - ERROR level (critical issues)
+error_handler = logging.FileHandler('errors.log')
+error_handler.setLevel(logging.ERROR)
+error_handler.setFormatter(file_format)
+logger.addHandler(error_handler)
+
+# 4. Trade Register Logger Setup
+# This logger will be used specifically for recording trades in a separate file
+trade_register_logger = logging.getLogger('trade_register')
+trade_register_logger.setLevel(logging.INFO)
+# Prevent propagation to root logger to avoid duplicating in autoTrade.log/console
+trade_register_logger.propagate = False 
+
+trade_handler = logging.FileHandler('trades.log')
+trade_handler.setLevel(logging.INFO)
+trade_formatter = logging.Formatter('%(asctime)s,%(message)s')
+trade_handler.setFormatter(trade_formatter)
+trade_register_logger.addHandler(trade_handler)
+
+# Use the root logger for the main script
 logger = logging.getLogger(__name__)
 
 async def main():

@@ -48,20 +48,42 @@ class TradeLogger:
             logger.error(f"Error processing order status: {e}")
 
     async def _process_exec_details(self, trade: IBTrade, fill: Fill):
-        # Check for realized PnL
-        if fill.execution.realizedPNL:
-             pnl = fill.execution.realizedPNL
-             logger.info(f"Realized PnL: {pnl} for {trade.contract.symbol}")
+        # specific logger for trade registration
+        trade_reg_logger = logging.getLogger('trade_register')
+        
+        symbol = trade.contract.symbol
+        action = fill.execution.side
+        qty = fill.execution.shares
+        price = fill.execution.price
+        pnl = fill.execution.realizedPNL
+        
+        # Determine if it's likely an Open or Close based on PnL or Action logic if needed.
+        # IBKR sends realizedPNL on closing trades.
+        # But let's just log "EXECUTION" and let the user see.
+        # User asked for "registering trades open and close and p l".
+        
+        log_msg = f"ACTION: {action}, SYMBOL: {symbol}, QTY: {qty}, PRICE: {price}"
+        
+        if pnl and pnl != 0:
+             # Closing trade with PnL
+             log_msg += f", PnL: {pnl} (CLOSE)"
+             trade_reg_logger.info(log_msg)
+             logger.info(f"Realized PnL: {pnl} for {symbol}")
              
-             # Log trade
+             # Log trade to DB
              t = Trade(
                  id=None,
-                 ticker=trade.contract.symbol,
+                 ticker=symbol,
                  entry_price=0.0, # Hard to track without full history matching
-                 exit_price=fill.execution.price,
-                 quantity=fill.execution.shares,
+                 exit_price=price,
+                 quantity=qty,
                  pnl=pnl,
                  opened_at=fill.execution.time, # Approximate
                  closed_at=fill.execution.time
              )
              await self.db.log_trade(t)
+        else:
+             # Opening trade or partial fill without PnL
+             log_msg += " (OPEN/PARTIAL)"
+             trade_reg_logger.info(log_msg)
+             logger.info(f"Filled: {action} {qty} {symbol} @ {price}")

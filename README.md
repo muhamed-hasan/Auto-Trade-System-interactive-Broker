@@ -31,9 +31,15 @@ AutoTrade is a robust, asynchronous automated trading bot designed to execute tr
 *   **Database**: `aiosqlite` (Async SQLite)
 *   **Architecture**: Event-driven, asynchronous loop managing polling, execution, and risk checks concurrently.
 
-## 📋 Prerequisites
+## � Quick Links
 
-1.  **Interactive Brokers Account**: IB Gateway or TWS (Trader Workstation) must be installed and running.
+*   **System Landing Page**: [trade.phantomsw.com](http://trade.phantomsw.com)
+*   **Indicators Setup**: [chart.phantomsw.com](http://chart.phantomsw.com) - Link our indicators to your system for automated trading.
+
+## �📋 Prerequisites
+
+1.  **Interactive Brokers Account**: You must download and install **IB Gateway** (recommended) or TWS.
+    *   [Download IB Gateway Latest Version](https://www.interactivebrokers.com/en/trading/ibgateway-latest.php)
 2.  **Python 3.11** or higher.
 3.  **Telegram Bot**:
     *   Create a bot via @BotFather.
@@ -165,9 +171,14 @@ This software is for educational purposes only. Do not risk money which you are 
     *   قاعدة بيانات SQLite لتسجيل الإشارات والأوامر والصفقات.
     *   إغلاق سلس ومعالجة للأخطاء.
 
-## 📋 المتطلبات
+## � روابط سريعة
 
-1.  حساب **Interactive Brokers**: يجب تثبيت وتشغيل IB Gateway أو TWS.
+*   **صفحة النظام**: [trade.phantomsw.com](http://trade.phantomsw.com)
+*   **إعداد المؤشرات**: [chart.phantomsw.com](http://chart.phantomsw.com) - لربط مؤشراتنا مع النظام للتداول الآلي.
+
+## �📋 المتطلبات
+
+1.  **حساب Interactive Brokers**: يجب تحميل وتثبيت **IB Gateway** (موصى به) من [هنا](https://www.interactivebrokers.com/en/trading/ibgateway-latest.php) أو TWS.
 2.  **Python 3.11** أو أحدث.
 3.  **بوت تيليجرام**:
     *   أنشئ بوت عبر BotFather.
@@ -260,7 +271,3 @@ This software is for educational purposes only. Do not risk money which you are 
 ## ⚠️ إخلاء مسؤولية
 
 هذا البرنامج للأغراض التعليمية فقط. لا تخاطر بأموال لا يمكنك تحمل خسارتها. استخدامك لهذا البرنامج هو على مسؤوليتك الخاصة. المطورون والمساهمون لا يتحملون أي مسؤولية عن نتائج تداولك.
-# Auto-Trade-System-interactive-Broker-
-# Auto-Trade-System-interactive-Broker
-# Auto-Trade-System-interactive-Broker
-# Auto-Trade-System-interactive-Broker

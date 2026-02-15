@@ -1,5 +1,6 @@
 
 import logging
+import asyncio
 from aiohttp import web
 import json
 from config import settings
@@ -29,6 +30,9 @@ class WebServer:
         self.app.router.add_post('/api/orders/cancel', self.handle_cancel_order)
         self.app.router.add_get('/api/history', self.handle_history)
         self.app.router.add_get('/api/status', self.handle_status)
+        self.app.router.add_post('/api/shutdown', self.handle_shutdown)
+        
+        self.shutdown_callbacks = []
 
     async def start(self, host="0.0.0.0", port=8080):
         self.runner = web.AppRunner(self.app)
@@ -41,7 +45,22 @@ class WebServer:
         if self.runner:
             await self.runner.cleanup()
 
+    def add_shutdown_listener(self, callback):
+        self.shutdown_callbacks.append(callback)
+
     # --- Handlers ---
+    
+    async def handle_shutdown(self, request):
+        logger.warning("Shutdown initiated via Web UI")
+        # Trigger all registered shutdown callbacks
+        for callback in self.shutdown_callbacks:
+             # If callback is async, await it, otherwise run it
+             if asyncio.iscoroutinefunction(callback):
+                 asyncio.create_task(callback())
+             else:
+                 callback()
+                 
+        return web.json_response({"status": "shutting_down", "message": "System is stopping..."})
 
     async def handle_index(self, request):
         return web.FileResponse('./web/static/index.html')

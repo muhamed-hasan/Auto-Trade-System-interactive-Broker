@@ -74,8 +74,16 @@ async def main():
     trade_logger = TradeLogger(db, order_executor)
     pnl_engine = PnLEngine(db, order_executor)
     
-    # 5. Initialize Web Server
+    # 5. Initialize Services
+    stop_event = asyncio.Event()
+    
+    def shutdown_trigger():
+        logger.warning("Web UI requested shutdown. Stopping system...")
+        stop_event.set()
+
+    # Initialize Web Server with shutdown trigger
     web_server = WebServer(db, order_executor, pnl_engine)
+    web_server.add_shutdown_listener(shutdown_trigger)
 
     # 6. Initialize Unified Bot
     # Using SIGNAL_BOT_TOKEN as the primary. Usually they are the same.
@@ -99,9 +107,7 @@ async def main():
         
         logger.info("System Online. Press Ctrl+C to stop.")
         
-        # Keep alive
-        stop_event = asyncio.Event()
-        
+        # Signal Handling
         def signal_handler():
             logger.info("Shutdown signal received.")
             stop_event.set()
@@ -118,13 +124,57 @@ async def main():
     except Exception as e:
         logger.error(f"Runtime error: {e}")
     finally:
-        logger.info("Shutting down...")
-        await trading_bot.stop()
+        logger.info("Initiating shutdown sequence...")
+        
+        # 1. Stop Telegram Bot
+        if 'trading_bot' in locals():
+            logger.info("Stopping Trading Bot...")
+            try:
+                await asyncio.wait_for(trading_bot.stop(), timeout=5.0)
+            except asyncio.TimeoutError:
+                logger.error("Trading Bot stop timed out.")
+            except Exception as e:
+                logger.error(f"Error stopping Trading Bot: {e}")
+
+        # 2. Stop Web Server
         if 'web_server' in locals():
-            await web_server.stop()
+            logger.info("Stopping Web Server...")
+            try:
+                await asyncio.wait_for(web_server.stop(), timeout=3.0)
+            except asyncio.TimeoutError:
+                logger.error("Web Server stop timed out.")
+            except Exception as e:
+                logger.error(f"Error stopping Web Server: {e}")
+
+        # 3. Disconnect IB
+        if 'order_executor' in locals():
+            logger.info("Disconnecting Order Executor...")
+            try:
+                await asyncio.wait_for(order_executor.disconnect(), timeout=3.0)
+            except asyncio.TimeoutError:
+                logger.error("Order Executor disconnect timed out.")
+            except Exception as e:
+                logger.error(f"Error disconnecting Order Executor: {e}")
+
+        # 4. Cancel all remaining tasks
+        tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
+        if tasks:
+            logger.info(f"Cancelling {len(tasks)} pending tasks...")
+            for task in tasks:
+                task.cancel()
+            
+            try:
+                await asyncio.wait(tasks, timeout=2.0)
+            except Exception:
+                pass
+
+        logger.info("Shutdown complete.")
 
 if __name__ == "__main__":
     try:
+        # Use a new event loop for cleaner restarts/stops if run interactively, 
+        # but standard asyncio.run is fine for scripts.
         asyncio.run(main())
     except KeyboardInterrupt:
+        # Handle the initial Ctrl+C if it happens during startup/before loop
         pass

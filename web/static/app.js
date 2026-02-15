@@ -310,6 +310,24 @@ async function cancelOrder(orderId) {
 
 
 
+async function stopService() {
+    if (!confirm("⚠️ ARE YOU SURE? ⚠️\n\nThis will STOP the entire AutoTrade service. You will need to restart it manually from the server.")) return;
+
+    try {
+        const response = await fetch(`${API_BASE}/shutdown`, { method: 'POST' });
+        const result = await response.json();
+
+        if (result.status === 'shutting_down') {
+            alert("Service is shutting down... The dashboard will disconnect.");
+            document.body.innerHTML = "<div style='display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; background:#0f172a; color:white; font-family:sans-serif;'><h1>System Shut Down</h1><p>The service has been stopped successfully.</p></div>";
+        } else {
+            alert("Error: " + (result.error || "Unknown"));
+        }
+    } catch (e) {
+        alert("Failed to send stop request: " + e);
+    }
+}
+
 function renderLogs(activity) {
     const logsContainer = document.getElementById("logs-feed");
     const entries = [];

@@ -45,6 +45,15 @@ class OrderExecutor:
                 self._connected = False
                 raise
     
+    async def disconnect(self):
+        """Disconnect from IB to ensure clean shutdown."""
+        if self.ib.isConnected():
+            logger.info("Disconnecting from IB...")
+            self.ib.disconnect()
+            self._connected = False
+            self._pnl_subscribed = False
+            logger.info("Disconnected from IB.")
+    
     async def _subscribe_pnl(self):
         """Subscribe to PnL updates for the account"""
         if self._pnl_subscribed:

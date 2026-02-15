@@ -681,3 +681,24 @@ body {
     font-family: 'Fira Code', monospace;
     font-weight: 500;
 }
+
+.stop-service-btn {
+    background: rgba(239, 68, 68, 0.2);
+    color: var(--accent-red);
+    border: 1px solid var(--accent-red);
+    padding: 6px 14px;
+    border-radius: var(--radius-btn);
+    font-weight: 600;
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.stop-service-btn:hover {
+    background: var(--accent-red);
+    color: white;
+    box-shadow: 0 0 12px rgba(239, 68, 68, 0.4);
+}

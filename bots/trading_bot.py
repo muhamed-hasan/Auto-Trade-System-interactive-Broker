@@ -162,6 +162,11 @@ class UnifiedBot:
             await self.db.log_order(signal_id, o)
             await message.reply_text(f"✅ Order Placed: {signal.action.upper()} {signal.ticker}\nID: {trade.order.orderId}")
             
+        except ValueError as ve:
+            logger.warning(f"Execution Validation Failed: {ve}")
+            await self.db.update_signal_status(signal_id, f"rejected: {ve}")
+            await message.reply_text(f"⚠️ Order Rejected: {ve}")
+            
         except Exception as e:
             logger.error(f"Execution Error: {e}")
             await self.db.update_signal_status(signal_id, f"error: {e}")

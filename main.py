@@ -140,7 +140,7 @@ async def main():
         if 'web_server' in locals():
             logger.info("Stopping Web Server...")
             try:
-                await asyncio.wait_for(web_server.stop(), timeout=3.0)
+                await asyncio.wait_for(web_server.stop(), timeout=5.0)
             except asyncio.TimeoutError:
                 logger.error("Web Server stop timed out.")
             except Exception as e:

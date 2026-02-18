@@ -55,7 +55,7 @@ class TradeLogger:
         action = fill.execution.side
         qty = fill.execution.shares
         price = fill.execution.price
-        pnl = fill.execution.realizedPNL
+        pnl = fill.commissionReport.realizedPNL if fill.commissionReport else 0.0
         
         # Determine if it's likely an Open or Close based on PnL or Action logic if needed.
         # IBKR sends realizedPNL on closing trades.

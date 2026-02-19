@@ -36,7 +36,8 @@ class UnifiedBot:
         logger.info("Unified Trading Bot started polling...")
 
     async def stop(self):
-        await self.app.updater.stop()
+        if self.app.updater and self.app.updater.running:
+            await self.app.updater.stop()
         await self.app.stop()
         await self.app.shutdown()
 

@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import signal
+import os
 from config import settings
 from db.database import Database
 from core.risk_engine import RiskEngine
@@ -108,15 +109,23 @@ async def main():
         logger.info("System Online. Press Ctrl+C to stop.")
         
         # Signal Handling
+        shutdown_called = False
         def signal_handler():
-            logger.info("Shutdown signal received.")
-            stop_event.set()
+            nonlocal shutdown_called
+            if not shutdown_called:
+                logger.info("Shutdown signal received. Press Ctrl+C again to force quit.")
+                shutdown_called = True
+                stop_event.set()
+            else:
+                logger.warning("Force quit received. Terminating immediately.")
+                os._exit(1)
             
         loop = asyncio.get_running_loop()
         try:
             loop.add_signal_handler(signal.SIGINT, signal_handler)
             loop.add_signal_handler(signal.SIGTERM, signal_handler)
-        except NotImplementedError:
+        except (NotImplementedError, ValueError):
+             # ValueError can happen if not in main thread, though unlikely here
              pass
 
         await stop_event.wait()
@@ -130,7 +139,7 @@ async def main():
         if 'trading_bot' in locals():
             logger.info("Stopping Trading Bot...")
             try:
-                await asyncio.wait_for(trading_bot.stop(), timeout=5.0)
+                await asyncio.wait_for(trading_bot.stop(), timeout=3.0)
             except asyncio.TimeoutError:
                 logger.error("Trading Bot stop timed out.")
             except Exception as e:
@@ -140,7 +149,7 @@ async def main():
         if 'web_server' in locals():
             logger.info("Stopping Web Server...")
             try:
-                await asyncio.wait_for(web_server.stop(), timeout=5.0)
+                await asyncio.wait_for(web_server.stop(), timeout=3.0)
             except asyncio.TimeoutError:
                 logger.error("Web Server stop timed out.")
             except Exception as e:
@@ -164,7 +173,7 @@ async def main():
                 task.cancel()
             
             try:
-                await asyncio.wait(tasks, timeout=2.0)
+                await asyncio.wait_for(asyncio.gather(*tasks, return_exceptions=True), timeout=1.0)
             except Exception:
                 pass
 

@@ -57,6 +57,7 @@ class UnifiedBot:
             [InlineKeyboardButton("📜 Open Positions", callback_data='positions')],
             [InlineKeyboardButton("⏸ Pause Trading", callback_data='pause'),
              InlineKeyboardButton("▶️ Resume Trading", callback_data='resume')],
+            [InlineKeyboardButton("📊 Market Status", callback_data='market_status')]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         status = await self.db.get_system_state("trading_status") or "active"
@@ -105,6 +106,24 @@ class UnifiedBot:
             
         elif data == 'settings':
              await query.edit_message_text(f"Settings:\nMode: {settings.TRADING_MODE}\nRisk: {settings.MAX_RISK_PER_TRADE_PERCENT*100}%")
+
+        elif data == 'market_status':
+            indices = await self.executor.get_market_indices()
+            spy = indices.get("SPY", {})
+            vix = indices.get("VIX", {})
+            
+            spy_val = spy.get("value", 0.0)
+            spy_change = spy.get("change", 0.0)
+            vix_val = vix.get("value", 0.0)
+            vix_change = vix.get("change", 0.0)
+            
+            spy_icon = "🟢" if spy_change >= 0 else "🔴"
+            vix_icon = "🔴" if vix_change >= 0 else "🟢" # VIX up is usually bad for market
+            
+            msg = (f"📊 **Market Status**\n\n"
+                   f"**SPY**: ${spy_val:.2f} ({spy_icon} {spy_change:+.2f}%)\n"
+                   f"**VIX**: ${vix_val:.2f} ({vix_icon} {vix_change:+.2f}%)")
+            await query.edit_message_text(msg)
 
     # --- Signal Listener Logic ---
     async def handle_signal(self, update: Update, context: ContextTypes.DEFAULT_TYPE):

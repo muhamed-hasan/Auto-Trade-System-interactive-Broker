@@ -24,6 +24,7 @@ class WebServer:
         self.app.router.add_get('/api/account', self.handle_account)
         self.app.router.add_get('/api/positions', self.handle_positions)
         self.app.router.add_post('/api/positions/close', self.handle_close_position)
+        self.app.router.add_post('/api/positions/close_all', self.handle_close_all_positions)
         self.app.router.add_get('/api/pnl', self.handle_pnl)
         self.app.router.add_get('/api/activity', self.handle_activity)
         self.app.router.add_get('/api/orders/open', self.handle_open_orders)
@@ -175,6 +176,14 @@ class WebServer:
                 return web.json_response({"error": f"Position for {symbol} not found or could not be closed"}, status=404)
         except Exception as e:
             logger.error(f"Error closing position: {e}")
+            return web.json_response({"error": str(e)}, status=500)
+
+    async def handle_close_all_positions(self, request):
+        try:
+            await self.executor.close_all_positions()
+            return web.json_response({"status": "closed_all", "message": "Close all positions initiated"})
+        except Exception as e:
+            logger.error(f"Error closing all positions: {e}")
             return web.json_response({"error": str(e)}, status=500)
 
 

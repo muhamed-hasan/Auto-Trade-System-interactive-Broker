@@ -231,6 +231,25 @@ async function closePosition(symbol) {
     }
 }
 
+async function closeAllPositions() {
+    if (!confirm("⚠️ ARE YOU SURE? ⚠️\n\nThis will establish MARKET SELL orders for ALL open positions immediately.")) return;
+
+    try {
+        const response = await fetch('/api/positions/close_all', { method: 'POST' });
+        const result = await response.json();
+
+        if (result.status === 'closed_all') {
+            alert("Close All initiated for all positions.");
+            updateDashboard();
+        } else {
+            alert("Error: " + (result.error || "Unknown"));
+        }
+    } catch (e) {
+        console.error(e);
+        alert("Failed to send close all request");
+    }
+}
+
 function renderPendingOrders(orders) {
     const container = document.getElementById("pending-orders-list");
     const badge = document.getElementById("pending-orders-badge");

@@ -57,7 +57,8 @@ class UnifiedBot:
             [InlineKeyboardButton("📜 Open Positions", callback_data='positions')],
             [InlineKeyboardButton("⏸ Pause Trading", callback_data='pause'),
              InlineKeyboardButton("▶️ Resume Trading", callback_data='resume')],
-            [InlineKeyboardButton("📊 Market Status", callback_data='market_status')]
+            [InlineKeyboardButton("📊 Market Status", callback_data='market_status')],
+            [InlineKeyboardButton("🚨 Close All Positions", callback_data='close_all')]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         status = await self.db.get_system_state("trading_status") or "active"
@@ -103,6 +104,11 @@ class UnifiedBot:
             await self.executor.cancel_all_orders()
             await self.executor.close_all_positions()
             await query.edit_message_text("🚨 KILL SWITCH ACTIVATED: All orders cancelled & positions closing.")
+            
+        elif data == 'close_all':
+            await self.executor.close_all_positions()
+            await query.edit_message_text("🚨 **CLOSE ALL**: Closing all open positions...")
+
             
         elif data == 'settings':
              await query.edit_message_text(f"Settings:\nMode: {settings.TRADING_MODE}\nRisk: {settings.MAX_RISK_PER_TRADE_PERCENT*100}%")

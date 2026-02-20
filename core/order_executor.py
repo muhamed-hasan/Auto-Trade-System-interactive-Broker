@@ -17,6 +17,7 @@ class OrderExecutor:
         self._pnl_subscribed = False
         self.spy_ticker = None
         self.vix_ticker = None
+        self._connection_failures = 0
 
     async def connect(self):
         """
@@ -25,12 +26,15 @@ class OrderExecutor:
         if not self.ib.isConnected():
             logger.info(f"Connecting to IB at {settings.IB_HOST}:{settings.IB_PORT} with ID {self.client_id}...")
             try:
+                # Always safely disconnect first if we are trying to reconnect
+                self.ib.disconnect()
                 await self.ib.connectAsync(
                     host=settings.IB_HOST, 
                     port=settings.IB_PORT, 
                     clientId=self.client_id
                 )
                 self._connected = True
+                self._connection_failures = 0
                 logger.info("Connected to IB.")
                 # Set market data type to Delayed Frozen (4) to get data even if market closed/no sub
                 self.ib.reqMarketDataType(4)
@@ -41,8 +45,15 @@ class OrderExecutor:
                 await self._subscribe_market_data()
                 
             except Exception as e:
-                logger.error(f"Failed to connect to IB: {e}")
+                self._connection_failures += 1
+                logger.error(f"Failed to connect to IB (Attempt {self._connection_failures}): {e}")
                 self._connected = False
+                
+                if self._connection_failures >= 5:
+                    import os
+                    logger.critical("Maximum IB connection retries reached. Exiting system for a fresh restart...")
+                    os._exit(1)
+                    
                 raise
     
     async def disconnect(self):

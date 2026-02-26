@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime, timezone
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 from config import settings
@@ -138,6 +139,19 @@ class UnifiedBot:
             return
 
         chat_id = update.effective_chat.id
+        
+        # Prevent processing old messages on startup (older than 10 seconds)
+        now = datetime.now(timezone.utc)
+        if message.date:
+            message_date = message.date
+            # Ensure message_date is timezone-aware
+            if not message_date.tzinfo:
+                message_date = message_date.replace(tzinfo=timezone.utc)
+            
+            age = (now - message_date).total_seconds()
+            if age > 10:
+                logger.info(f"Ignoring old message from {chat_id} (age: {age:.1f}s)")
+                return
         
         # Filter by Channel ID if configured
         if settings.TELEGRAM_CHANNEL_ID != 0 and chat_id != settings.TELEGRAM_CHANNEL_ID:

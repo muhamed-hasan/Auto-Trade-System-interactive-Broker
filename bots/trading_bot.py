@@ -1,4 +1,6 @@
 import logging
+import re
+import unicodedata
 from datetime import datetime, timezone
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
@@ -29,6 +31,13 @@ class UnifiedBot:
         # Handlers - Signal Listener
         # We listen for text messages. Filtering by channel ID is done inside the handler.
         self.app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_signal))
+        
+        # IMPORTANT: Channel posts (from TradingView via Telegram channels) come as
+        # channel_post updates, NOT regular message updates. We need a separate handler.
+        self.app.add_handler(MessageHandler(
+            filters.UpdateType.CHANNEL_POST & filters.TEXT,
+            self.handle_signal
+        ))
 
     async def start(self):
         await self.app.initialize()
@@ -133,14 +142,49 @@ class UnifiedBot:
             await query.edit_message_text(msg)
 
     # --- Signal Listener Logic ---
+    @staticmethod
+    def _sanitize_text(text: str) -> str:
+        """
+        Remove invisible/special Unicode characters that TradingView or Telegram
+        inject into messages. These break JSON parsing even though the message
+        looks identical when copy-pasted.
+        """
+        # Remove BOM (Byte Order Mark)
+        text = text.replace('\ufeff', '')
+        # Remove zero-width characters (common in Telegram forwarded messages)
+        text = text.replace('\u200b', '')  # zero-width space
+        text = text.replace('\u200c', '')  # zero-width non-joiner
+        text = text.replace('\u200d', '')  # zero-width joiner
+        text = text.replace('\u200e', '')  # left-to-right mark
+        text = text.replace('\u200f', '')  # right-to-left mark
+        text = text.replace('\u2060', '')  # word joiner
+        text = text.replace('\ufffe', '')  # non-character
+        # Remove other common invisible control characters (C0/C1) except newlines and tabs
+        text = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]', '', text)
+        # Remove any remaining Unicode category "Cf" (format characters) except standard whitespace
+        text = ''.join(
+            ch for ch in text
+            if unicodedata.category(ch) != 'Cf'
+        )
+        # Strip leading/trailing whitespace
+        text = text.strip()
+        return text
+
     async def handle_signal(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         message = update.effective_message
-        if not message or not message.text:
+        if not message:
+            return
+        
+        # Get text — channel posts may only have text in effective_message
+        raw_text = message.text or message.caption
+        if not raw_text:
+            logger.debug(f"Received non-text message, skipping. Update type: {update.effective_message.__class__.__name__}")
             return
 
         chat_id = update.effective_chat.id
         
-        # Prevent processing old messages on startup (older than 10 seconds)
+        # Prevent processing old messages on startup (older than 60 seconds)
+        # Increased from 10s because TradingView -> Telegram can have delivery latency
         now = datetime.now(timezone.utc)
         if message.date:
             message_date = message.date
@@ -149,7 +193,7 @@ class UnifiedBot:
                 message_date = message_date.replace(tzinfo=timezone.utc)
             
             age = (now - message_date).total_seconds()
-            if age > 10:
+            if age > 20:
                 logger.info(f"Ignoring old message from {chat_id} (age: {age:.1f}s)")
                 return
         
@@ -164,13 +208,21 @@ class UnifiedBot:
             logger.info("Signal received but trading is PAUSED. Ignoring.")
             return
 
-        text = message.text
+        # Sanitize text: remove invisible Unicode characters from TradingView
+        text = self._sanitize_text(raw_text)
         logger.info(f"Received signal message from {chat_id}: {text}")
+        
+        # Log raw bytes for debugging if text differs after sanitization
+        if text != raw_text:
+            logger.info(f"Text was sanitized (removed invisible chars). Raw length={len(raw_text)}, clean length={len(text)}")
         
         try:
             signal = validate_signal(text)
         except ValueError as e:
-            await message.reply_text(f"❌ Invalid format: {e}")
+            logger.warning(f"Signal validation failed from {chat_id}: {e} | Raw text: {repr(raw_text)}")
+            # Only reply if this is a direct message (not a channel post, to avoid spamming channels)
+            if update.effective_chat.type != 'channel':
+                await message.reply_text(f"❌ Invalid format: {e}")
             return
 
         signal_id = await self.db.log_signal(signal, status="received")

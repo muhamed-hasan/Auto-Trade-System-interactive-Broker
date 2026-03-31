@@ -33,9 +33,16 @@ def validate_signal(raw_json: str) -> Signal:
     Parses and validates a JSON string, returning a normalized Signal object.
     Raises ValueError if validation fails.
     """
+    # Normalize smart/curly quotes that Telegram or TradingView may inject
+    raw_json = raw_json.replace('\u201c', '"').replace('\u201d', '"')  # smart double quotes
+    raw_json = raw_json.replace('\u2018', "'").replace('\u2019', "'")  # smart single quotes
+    raw_json = raw_json.replace('\u00ab', '"').replace('\u00bb', '"')  # guillemets
+    raw_json = raw_json.strip()
+    
     try:
         data = json.loads(raw_json)
     except json.JSONDecodeError as e:
+        logger.error(f"JSON parse failed. Raw text repr: {repr(raw_json[:200])}")
         raise ValueError(f"Invalid JSON format: {e}")
 
     try:

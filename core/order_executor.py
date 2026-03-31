@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import time
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 import math
@@ -18,6 +19,12 @@ class OrderExecutor:
         self.spy_ticker = None
         self.vix_ticker = None
         self._connection_failures = 0
+        # Account summary cache to prevent Error 322 (max requests exceeded)
+        self._account_cache = None
+        self._account_cache_time = 0
+        self._account_cache_ttl = 5  # seconds
+        # Track suppressed errors to avoid log spam
+        self._vix_error_logged = False
 
     async def connect(self):
         """
@@ -38,6 +45,9 @@ class OrderExecutor:
                 logger.info("Connected to IB.")
                 # Set market data type to Delayed Frozen (4) to get data even if market closed/no sub
                 self.ib.reqMarketDataType(4)
+
+                # Register error handler for graceful degradation
+                self.ib.errorEvent += self._on_ib_error
 
                 # Subscribe to PnL updates
                 await self._subscribe_pnl()
@@ -90,9 +100,29 @@ class OrderExecutor:
             # We assign to self so we can access ticker.marketPrice() later
             self.spy_ticker = self.ib.reqMktData(spy, '', False, False)
             self.vix_ticker = self.ib.reqMktData(vix, '', False, False)
+            self._vix_error_logged = False  # Reset on new subscription
             logger.info("Subscribed to SPY and VIX market data")
         except Exception as e:
             logger.error(f"Failed to subscribe to market data: {e}")
+
+    def _on_ib_error(self, reqId, errorCode, errorString, contract):
+        """Handle IB errors for graceful degradation"""
+        # Error 354: Market data not subscribed (e.g., VIX requires CBOE subscription)
+        if errorCode == 354:
+            if not self._vix_error_logged:
+                logger.warning(f"Market data not subscribed for {contract.symbol if contract else 'unknown'}. "
+                             f"VIX data will show as 0. Subscribe via IB Account > Market Data.")
+                self._vix_error_logged = True
+            # Cancel the failed VIX market data request to stop further errors
+            if self.vix_ticker and contract and contract.symbol == 'VIX':
+                try:
+                    self.ib.cancelMktData(contract)
+                except Exception:
+                    pass
+                self.vix_ticker = None
+        # Error 322: Max account summary requests — handled by caching, just log once
+        elif errorCode == 322:
+            logger.warning("Account summary request limit reached. Using cached data.")
 
     async def get_market_indices(self) -> dict:
         """Get current prices for SPY and VIX"""
@@ -284,10 +314,18 @@ class OrderExecutor:
     async def get_account_summary(self) -> dict:
         if not self.ib.isConnected():
              await self.connect()
+
+        # Return cached data if still fresh (prevents Error 322: max account summary requests)
+        now = time.time()
+        if self._account_cache and (now - self._account_cache_time) < self._account_cache_ttl:
+            return self._account_cache
              
         try:
             tags = await self.ib.accountSummaryAsync()
         except Exception: # If lost connection during call
+            # Return stale cache if available, otherwise try reconnect
+            if self._account_cache:
+                return self._account_cache
             await self.connect()
             tags = await self.ib.accountSummaryAsync()
 
@@ -296,6 +334,11 @@ class OrderExecutor:
         
         summary = {t.tag: float(t.value) for t in tags if t.tag in ['NetLiquidation', 'BuyingPower', 'TotalCashValue', 'UnrealizedPnL', 'RealizedPnL', 'DailyPnL']}
         logger.debug(f"Account summary P&L values: RealizedPnL={summary.get('RealizedPnL', 'N/A')}, DailyPnL={summary.get('DailyPnL', 'N/A')}, UnrealizedPnL={summary.get('UnrealizedPnL', 'N/A')}")
+        
+        # Update cache
+        self._account_cache = summary
+        self._account_cache_time = now
+        
         return summary
 
     async def get_daily_pnl(self) -> dict:

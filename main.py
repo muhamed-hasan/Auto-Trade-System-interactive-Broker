@@ -82,12 +82,7 @@ async def main():
         logger.warning("Web UI requested shutdown. Stopping system...")
         stop_event.set()
 
-    # Initialize Web Server with shutdown trigger
-    web_server = WebServer(db, order_executor, pnl_engine)
-    web_server.add_shutdown_listener(shutdown_trigger)
-
-    # 6. Initialize Unified Bot
-    # Using SIGNAL_BOT_TOKEN as the primary. Usually they are the same.
+    # 6. Initialize Unified Bot (BEFORE web server, so we can pass reference)
     token = settings.TELEGRAM_SIGNAL_BOT_TOKEN
     if not token:
         logger.error("No Telegram Bot Token found in settings!")
@@ -101,12 +96,30 @@ async def main():
         db=db
     )
 
-    # 7. Start Services
+    # 7. Initialize Web Server with webhook support and shutdown trigger
+    web_server = WebServer(db, order_executor, pnl_engine, risk_engine=risk_engine, trading_bot=trading_bot)
+    web_server.add_shutdown_listener(shutdown_trigger)
+
+    # 8. Start Services
     try:
         await web_server.start() # Start Web Dashboard
         await trading_bot.start()
         
         logger.info("System Online. Press Ctrl+C to stop.")
+        
+        # Send startup notification to Telegram
+        try:
+            startup_msg = (
+                "🟢 **AutoTrade System Online**\n"
+                f"⏰ Started at: {__import__('datetime').datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+                f"📡 IB Connected: {order_executor.ib.isConnected()}\n"
+                f"🌐 Webhook URL: http://YOUR_SERVER:8080/webhook/tradingview\n"
+                f"🔧 Mode: {settings.TRADING_MODE}"
+            )
+            await web_server.send_telegram_notification(startup_msg)
+            logger.info("Startup notification sent to Telegram")
+        except Exception as e:
+            logger.warning(f"Failed to send startup notification: {e}")
         
         # Signal Handling
         shutdown_called = False

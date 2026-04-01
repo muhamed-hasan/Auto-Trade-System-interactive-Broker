@@ -3,15 +3,21 @@ import logging
 import asyncio
 from aiohttp import web
 import json
+import re
+import unicodedata
+from datetime import datetime, timezone
 from config import settings
+from core.signal_validator import validate_signal
 
 logger = logging.getLogger(__name__)
 
 class WebServer:
-    def __init__(self, db, order_executor, pnl_engine):
+    def __init__(self, db, order_executor, pnl_engine, risk_engine=None, trading_bot=None):
         self.db = db
         self.executor = order_executor
         self.pnl_engine = pnl_engine
+        self.risk_engine = risk_engine
+        self.trading_bot = trading_bot  # Reference to send Telegram notifications
         self.app = web.Application()
         self.runner = None
         self.site = None
@@ -32,6 +38,9 @@ class WebServer:
         self.app.router.add_get('/api/history', self.handle_history)
         self.app.router.add_get('/api/status', self.handle_status)
         self.app.router.add_post('/api/shutdown', self.handle_shutdown)
+        
+        # TradingView Webhook endpoint - receives signals directly via HTTP POST
+        self.app.router.add_post('/webhook/tradingview', self.handle_tradingview_webhook)
         
         self.shutdown_callbacks = []
 
@@ -211,3 +220,129 @@ class WebServer:
             })
         except Exception as e:
             return web.json_response({"error": str(e)}, status=500)
+
+    # --- TradingView Webhook ---
+    
+    @staticmethod
+    def _sanitize_webhook_text(text: str) -> str:
+        """Remove invisible Unicode characters from webhook payloads."""
+        text = text.replace('\ufeff', '')
+        text = text.replace('\u200b', '').replace('\u200c', '').replace('\u200d', '')
+        text = text.replace('\u200e', '').replace('\u200f', '').replace('\u2060', '')
+        text = text.replace('\u201c', '"').replace('\u201d', '"')
+        text = text.replace('\u2018', "'").replace('\u2019', "'")
+        text = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]', '', text)
+        text = ''.join(ch for ch in text if unicodedata.category(ch) != 'Cf')
+        return text.strip()
+
+    async def send_telegram_notification(self, message: str):
+        """Send a notification message to the configured Telegram channel/user."""
+        if not self.trading_bot:
+            logger.warning("No trading bot reference, can't send Telegram notification")
+            return
+        try:
+            # Send to whitelisted user(s) for reliability
+            for user_id in settings.TELEGRAM_WHITELIST_IDS:
+                try:
+                    await self.trading_bot.app.bot.send_message(
+                        chat_id=user_id,
+                        text=message
+                    )
+                except Exception as e:
+                    logger.error(f"Failed to notify user {user_id}: {e}")
+        except Exception as e:
+            logger.error(f"Failed to send Telegram notification: {e}")
+
+    async def handle_tradingview_webhook(self, request):
+        """
+        Receives TradingView webhook alerts directly via HTTP POST.
+        This bypasses the Telegram relay entirely, fixing the issue where
+        the bot cannot read its own messages posted to a Telegram channel.
+        
+        TradingView Alert URL: http://YOUR_SERVER:8080/webhook/tradingview
+        TradingView Alert Message: Your JSON signal body
+        """
+        try:
+            # Read the raw body
+            raw_body = await request.text()
+            logger.info(f"[WEBHOOK] Received TradingView webhook: {raw_body[:200]}")
+            
+            # Sanitize
+            clean_body = self._sanitize_webhook_text(raw_body)
+            
+            # Check for System Pause
+            status = await self.db.get_system_state("trading_status")
+            if status == "paused":
+                logger.info("[WEBHOOK] Signal received but trading is PAUSED.")
+                await self.send_telegram_notification("⏸ Webhook signal received but trading is PAUSED.")
+                return web.json_response({"status": "paused", "message": "Trading is paused"}, status=200)
+            
+            # Validate signal
+            try:
+                signal = validate_signal(clean_body)
+            except ValueError as e:
+                logger.warning(f"[WEBHOOK] Invalid signal: {e}")
+                return web.json_response({"status": "error", "message": f"Invalid signal: {e}"}, status=400)
+            
+            # Log signal
+            signal_id = await self.db.log_signal(signal, status="received")
+            
+            # Risk check
+            if self.risk_engine:
+                summary = await self.executor.get_account_summary()
+                positions = await self.executor.get_all_positions()
+                approved, reason = await self.risk_engine.evaluate(signal, summary, positions or [])
+                
+                if not approved:
+                    await self.db.update_signal_status(signal_id, f"rejected: {reason}")
+                    msg = f"⛔ Webhook Signal Rejected: {reason}\nTicker: {signal.ticker}"
+                    await self.send_telegram_notification(msg)
+                    logger.warning(f"[WEBHOOK] Signal rejected: {reason}")
+                    return web.json_response({"status": "rejected", "reason": reason}, status=200)
+            
+            # Execute order
+            try:
+                await self.db.update_signal_status(signal_id, "executing")
+                trade = await self.executor.execute_order(signal)
+                
+                from db.models import Order
+                o = Order(
+                    id=None,
+                    signal_id=signal_id,
+                    ib_order_id=trade.order.orderId,
+                    ticker=signal.ticker,
+                    action=signal.action,
+                    quantity=trade.order.totalQuantity,
+                    order_type=signal.order_type,
+                    status=trade.orderStatus.status
+                )
+                await self.db.log_order(signal_id, o)
+                
+                msg = f"✅ Order Placed (Webhook): {signal.action.upper()} {signal.ticker}\nID: {trade.order.orderId}\nQty: {trade.order.totalQuantity}"
+                await self.send_telegram_notification(msg)
+                logger.info(f"[WEBHOOK] Order executed: {signal.action} {signal.ticker}")
+                
+                return web.json_response({
+                    "status": "executed",
+                    "ticker": signal.ticker,
+                    "action": signal.action,
+                    "order_id": trade.order.orderId
+                })
+                
+            except ValueError as ve:
+                await self.db.update_signal_status(signal_id, f"rejected: {ve}")
+                msg = f"⚠️ Order Rejected (Webhook): {ve}\nTicker: {signal.ticker}"
+                await self.send_telegram_notification(msg)
+                logger.warning(f"[WEBHOOK] Order rejected: {ve}")
+                return web.json_response({"status": "rejected", "reason": str(ve)}, status=200)
+                
+            except Exception as e:
+                await self.db.update_signal_status(signal_id, f"error: {e}")
+                msg = f"⚠️ Execution Failed (Webhook): {e}\nTicker: {signal.ticker}"
+                await self.send_telegram_notification(msg)
+                logger.error(f"[WEBHOOK] Execution error: {e}")
+                return web.json_response({"status": "error", "message": str(e)}, status=500)
+                
+        except Exception as e:
+            logger.error(f"[WEBHOOK] Webhook handler error: {e}")
+            return web.json_response({"status": "error", "message": str(e)}, status=500)

@@ -318,18 +318,25 @@ class WebServer:
         if not self.trading_bot:
             logger.warning("No trading bot reference, can't send Telegram notification")
             return
-        try:
-            # Send to whitelisted user(s) for reliability
-            for user_id in settings.TELEGRAM_WHITELIST_IDS:
-                try:
-                    await self.trading_bot.app.bot.send_message(
-                        chat_id=user_id,
-                        text=message
-                    )
-                except Exception as e:
-                    logger.error(f"Failed to notify user {user_id}: {e}")
-        except Exception as e:
-            logger.error(f"Failed to send Telegram notification: {e}")
+
+        async def _send():
+            try:
+                # Send to whitelisted user(s) for reliability
+                for user_id in settings.TELEGRAM_WHITELIST_IDS:
+                    try:
+                        await asyncio.wait_for(
+                            self.trading_bot.app.bot.send_message(
+                                chat_id=user_id,
+                                text=message
+                            ),
+                            timeout=5.0
+                        )
+                    except Exception as e:
+                        logger.error(f"Failed to notify user {user_id}: {e}")
+            except Exception as e:
+                logger.error(f"Failed to send Telegram notification: {e}")
+
+        asyncio.create_task(_send())
 
     async def handle_tradingview_webhook(self, request):
         """

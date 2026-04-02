@@ -209,13 +209,15 @@ class OrderExecutor:
         # Create Order
         if signal.order_type == "market":
             order = MarketOrder(signal.action.upper(), quantity)
-
+            order.tif = "DAY"
         elif signal.order_type == "limit" and signal.price:
             order = LimitOrder(signal.action.upper(), quantity, signal.price)
+            order.tif = "DAY"
         else:
             # Fallback to market if limit price not provided
             logger.warning("Limit order requested but no price provided. Using Market.")
             order = MarketOrder(signal.action.upper(), quantity)
+            order.tif = "DAY"
 
         trade = self.ib.placeOrder(contract, order)
         logger.info(f"Order placed: {trade}")

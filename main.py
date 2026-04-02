@@ -103,7 +103,10 @@ async def main():
     # 8. Start Services
     try:
         await web_server.start() # Start Web Dashboard
-        await trading_bot.start()
+        
+        # Start the Telegram bot in the background so it doesn't block the UI server 
+        # from responding to account data requests if Telegram network is currently failing.
+        asyncio.create_task(trading_bot.start())
         
         logger.info("System Online. Press Ctrl+C to stop.")
         

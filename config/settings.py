@@ -17,7 +17,6 @@ IB_CLIENT_ID = int(os.getenv("IB_CLIENT_ID", "1"))
 
 # --- Telegram ---
 TELEGRAM_SIGNAL_BOT_TOKEN = os.getenv("TELEGRAM_SIGNAL_BOT_TOKEN")
-TELEGRAM_CONTROL_BOT_TOKEN = os.getenv("TELEGRAM_CONTROL_BOT_TOKEN")
 TELEGRAM_CHANNEL_ID = int(os.getenv("TELEGRAM_CHANNEL_ID", "0"))
 TELEGRAM_WHITELIST_IDS = [int(id_str) for id_str in os.getenv("TELEGRAM_WHITELIST_IDS", "").split(",") if id_str]
 

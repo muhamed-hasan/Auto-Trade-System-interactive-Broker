@@ -76,7 +76,6 @@ AutoTrade is a robust, asynchronous automated trading bot designed to execute tr
 
         # Telegram
         TELEGRAM_SIGNAL_BOT_TOKEN=your_bot_token_here
-        TELEGRAM_CONTROL_BOT_TOKEN=your_bot_token_here # Can be same as signal token
         TELEGRAM_CHANNEL_ID=-100xxxxxxxxx
         TELEGRAM_WHITELIST_IDS=12345678,87654321
 
@@ -215,7 +214,6 @@ This software is for educational purposes only. Do not risk money which you are 
 
         # Telegram
         TELEGRAM_SIGNAL_BOT_TOKEN=ضع_توكن_البوت_هنا
-        TELEGRAM_CONTROL_BOT_TOKEN=ضع_نفس_التوكن_هنا
         TELEGRAM_CHANNEL_ID=-100xxxxxxxxx
         TELEGRAM_WHITELIST_IDS=12345678,87654321
 

@@ -702,3 +702,128 @@ body {
     color: white;
     box-shadow: 0 0 12px rgba(239, 68, 68, 0.4);
 }
+
+/* History Table Enhancements */
+.sortable-header {
+    cursor: pointer;
+    user-select: none;
+    transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.sortable-header:hover {
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.sort-icon {
+    font-size: 0.8em;
+    margin-left: 4px;
+    color: var(--text-secondary);
+    opacity: 0.5;
+    display: inline-block;
+    transition: opacity 0.2s, color 0.2s;
+}
+
+.sort-active {
+    color: var(--accent-blue);
+    opacity: 1;
+}
+
+/* Badges */
+.action-badge {
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+}
+
+.action-buy {
+    background: var(--accent-green-dim);
+    color: var(--accent-green);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.action-sell {
+    background: var(--accent-red-dim);
+    color: var(--accent-red);
+    border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.status-badge {
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.status-filled {
+    background: var(--accent-green-dim);
+    color: var(--accent-green);
+}
+
+.status-cancelled {
+    background: var(--accent-red-dim);
+    color: var(--accent-red);
+}
+
+.status-pending, .status-submitted {
+    background: var(--accent-yellow-dim);
+    color: var(--accent-yellow);
+}
+
+.result-badge {
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+.result-win {
+    background: var(--accent-green-dim);
+    color: var(--accent-green);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.result-loss {
+    background: var(--accent-red-dim);
+    color: var(--accent-red);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.result-open {
+    background: var(--accent-yellow-dim);
+    color: var(--accent-yellow);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.result-even {
+    background: rgba(148, 163, 184, 0.15);
+    color: var(--text-secondary);
+    border: 1px solid rgba(148, 163, 184, 0.3);
+}
+
+/* Stats */
+.history-stats {
+    display: flex;
+    gap: 8px;
+}
+
+.stats-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.stat-chip {
+    background: var(--bg-dark);
+    padding: 4px 10px;
+    border-radius: var(--radius-btn);
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    border: 1px solid var(--divider);
+}
+
+.stat-win { color: var(--accent-green); }
+.stat-loss { color: var(--accent-red); }

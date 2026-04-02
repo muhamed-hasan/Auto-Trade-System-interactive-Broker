@@ -30,15 +30,6 @@ async function updateDashboard() {
     }
 }
 
-async function updateHistory() {
-    try {
-        const orders = await fetch(`${API_BASE}/history`).then(r => r.json());
-        renderHistoryTable(orders);
-    } catch (e) {
-        console.error("History Fetch Error:", e);
-    }
-}
-
 function switchTab(tabName) {
     currentTab = tabName;
 
@@ -74,10 +65,6 @@ function updateHeader(status) {
         dot.className = "status-dot";
         text.innerText = "IB Connection: DISCONNECTED";
     }
-
-    // Also update common metrics even if on history tab? 
-    // Usually keep header live. But updateDashboard skips.
-    // For simplicity, dashboard only updates when active.
 
     // Market Status
     const mktTitle = document.getElementById("market-status-title");
@@ -160,16 +147,18 @@ function renderPositionsList(positions) {
     const noPosMsg = document.getElementById("no-positions-msg");
     const badge = document.getElementById("pos-count-badge");
 
+    if (!badge || !tbody) return;
+
     badge.innerText = `${positions.length} Active`;
     tbody.innerHTML = "";
 
     if (positions.length === 0) {
-        noPosMsg.style.display = "block";
+        if(noPosMsg) noPosMsg.style.display = "block";
         tbody.closest("table").style.display = "none";
         return;
     }
 
-    noPosMsg.style.display = "none";
+    if(noPosMsg) noPosMsg.style.display = "none";
     tbody.closest("table").style.display = "table";
 
     positions.forEach(pos => {
@@ -280,27 +269,151 @@ function renderPendingOrders(orders) {
     });
 }
 
+// --- Trade History with Sorting ---
+let historyData = [];
+let sortColumn = 'time';
+let sortDirection = 'desc';
+
+async function updateHistory() {
+    try {
+        const orders = await fetch(`${API_BASE}/history`).then(r => r.json());
+        historyData = orders;
+        renderHistoryTable(historyData);
+    } catch (e) {
+        console.error("History Fetch Error:", e);
+    }
+}
+
+function sortHistory(column) {
+    if (sortColumn === column) {
+        sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+    } else {
+        sortColumn = column;
+        sortDirection = 'asc';
+    }
+
+    // Update sort icons
+    document.querySelectorAll('.sort-icon').forEach(icon => {
+        icon.textContent = '↕';
+        icon.classList.remove('sort-active');
+    });
+    const activeIcon = document.getElementById(`sort-icon-${column}`);
+    if (activeIcon) {
+        activeIcon.textContent = sortDirection === 'asc' ? '↑' : '↓';
+        activeIcon.classList.add('sort-active');
+    }
+
+    // Sort data
+    const sorted = [...historyData].sort((a, b) => {
+        let valA, valB;
+
+        switch (column) {
+            case 'time':
+                valA = new Date(a.created_at || 0).getTime();
+                valB = new Date(b.created_at || 0).getTime();
+                break;
+            case 'ticker':
+                valA = (a.ticker || '').toLowerCase();
+                valB = (b.ticker || '').toLowerCase();
+                return sortDirection === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+            case 'action':
+                valA = (a.action || '').toLowerCase();
+                valB = (b.action || '').toLowerCase();
+                return sortDirection === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+            case 'pnl':
+                valA = a.pnl_usd || 0;
+                valB = b.pnl_usd || 0;
+                break;
+            case 'status':
+                valA = (a.status || '').toLowerCase();
+                valB = (b.status || '').toLowerCase();
+                return sortDirection === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+            default:
+                valA = 0;
+                valB = 0;
+        }
+
+        return sortDirection === 'asc' ? valA - valB : valB - valA;
+    });
+
+    renderHistoryTable(sorted);
+}
+
 function renderHistoryTable(orders) {
     const tbody = document.getElementById("history-table-body");
+    const statsEl = document.getElementById("history-stats");
     tbody.innerHTML = "";
 
     if (!orders || orders.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:20px; color:#64748b;">No trades today</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding:20px; color:#64748b;">No trades today</td></tr>`;
+        if (statsEl) statsEl.innerHTML = '';
         return;
+    }
+
+    // Calculate summary stats
+    let wins = 0, losses = 0, totalPnl = 0, filledCount = 0;
+    orders.forEach(o => {
+        if (o.result === 'WIN') wins++;
+        if (o.result === 'LOSS') losses++;
+        if (o.pnl_usd) totalPnl += o.pnl_usd;
+        if (o.status === 'Filled') filledCount++;
+    });
+
+    if (statsEl) {
+        const pnlClass = totalPnl >= 0 ? 'text-green' : 'text-red';
+        const pnlSign = totalPnl >= 0 ? '+' : '';
+        statsEl.innerHTML = `
+            <div class="stats-row">
+                <span class="stat-chip">${orders.length} trades</span>
+                <span class="stat-chip stat-win">${wins}W</span>
+                <span class="stat-chip stat-loss">${losses}L</span>
+                <span class="stat-chip ${pnlClass}" style="font-weight:700;">${pnlSign}${formatCurrency(totalPnl)}</span>
+            </div>
+        `;
     }
 
     orders.forEach(o => {
         const row = document.createElement("tr");
         const ts = new Date(o.created_at).toLocaleTimeString();
-        const statusColor = o.status === 'Filled' ? 'text-green' : (o.status === 'Cancelled' ? 'text-red' : '');
+
+        // Status styling
+        let statusClass = '';
+        let statusLabel = o.status || 'Unknown';
+        if (statusLabel === 'Filled') statusClass = 'status-filled';
+        else if (statusLabel === 'Cancelled' || statusLabel === 'Canceled') statusClass = 'status-cancelled';
+        else if (statusLabel === 'PendingSubmit' || statusLabel === 'PreSubmitted') statusClass = 'status-pending';
+        else if (statusLabel === 'Submitted') statusClass = 'status-submitted';
+
+        // Result styling
+        let resultHtml = '<span style="color:#64748b;">—</span>';
+        if (o.result === 'WIN') {
+            resultHtml = '<span class="result-badge result-win">WIN</span>';
+        } else if (o.result === 'LOSS') {
+            resultHtml = '<span class="result-badge result-loss">LOSS</span>';
+        } else if (o.result === 'BREAK EVEN') {
+            resultHtml = '<span class="result-badge result-even">EVEN</span>';
+        } else if (o.result === 'OPEN') {
+            resultHtml = '<span class="result-badge result-open">OPEN</span>';
+        }
+
+        // P&L styling
+        let pnlHtml = '<span style="color:#64748b;">—</span>';
+        if (o.pnl_usd !== null && o.pnl_usd !== undefined) {
+            const pnlColor = o.pnl_usd >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
+            const pnlSign = o.pnl_usd >= 0 ? '+' : '';
+            pnlHtml = `<span style="color:${pnlColor}; font-weight:600; font-family:var(--font-mono);">${pnlSign}${formatCurrency(o.pnl_usd)}</span>`;
+        }
 
         row.innerHTML = `
-            <td>${ts}</td>
-            <td style="font-weight:600; color:${o.action === 'buy' ? 'var(--accent-green)' : 'var(--accent-red)'}">${o.action.toUpperCase()}</td>
+            <td style="font-family:var(--font-mono); font-size:0.8rem; white-space:nowrap;">${ts}</td>
+            <td><span class="action-badge action-${o.action}">${o.action.toUpperCase()}</span></td>
             <td><b>${o.ticker}</b></td>
             <td>${o.quantity}</td>
-            <td>${o.fill_price ? formatCurrency(o.fill_price) : '-'}</td>
-            <td class="${statusColor}">${o.status}</td>
+            <td style="text-align:right; font-family:var(--font-mono);">${o.buy_price ? formatCurrency(o.buy_price) : '<span style="color:#64748b;">—</span>'}</td>
+            <td style="text-align:right; font-family:var(--font-mono);">${o.sell_price ? formatCurrency(o.sell_price) : '<span style="color:#64748b;">—</span>'}</td>
+            <td style="text-align:right;">${pnlHtml}</td>
+            <td><span class="status-badge ${statusClass}">${statusLabel}</span></td>
+            <td>${resultHtml}</td>
         `;
         tbody.appendChild(row);
     });

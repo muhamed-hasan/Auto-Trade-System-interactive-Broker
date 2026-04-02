@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AutoTrade Professional</title>
-    <link rel="stylesheet" href="/static/index.css?v=2">
+    <link rel="stylesheet" href="/static/index.css?v=4">
     <script src="https://cdn.jsdelivr.net/npm/lucide@latest"></script>
     <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
 </head>
@@ -191,25 +191,41 @@
                     <div class="card-header">
                         <h3 class="card-title"><i data-lucide="history" width="18" style="margin-right:8px;"></i>
                             Today's Trades</h3>
-                        <button onclick="updateHistory()"
-                            style="background:none; border:none; color:var(--text-secondary); cursor:pointer;"><i
-                                data-lucide="refresh-cw" width="14"></i></button>
+                        <div style="display:flex; align-items:center; gap:12px;">
+                            <div class="history-stats" id="history-stats"></div>
+                            <button onclick="updateHistory()"
+                                style="background:none; border:none; color:var(--text-secondary); cursor:pointer;"><i
+                                    data-lucide="refresh-cw" width="14"></i></button>
+                        </div>
                     </div>
-                    <div class="card" style="padding:0;">
-                        <table class="simple-table">
+                    <div class="card" style="padding:0; overflow: auto;">
+                        <table class="simple-table sortable-table" id="history-table">
                             <thead>
                                 <tr>
-                                    <th>Time</th>
-                                    <th>Action</th>
-                                    <th>Ticker</th>
+                                    <th class="sortable-header" data-sort="time" onclick="sortHistory('time')">
+                                        Time <span class="sort-icon" id="sort-icon-time">↕</span>
+                                    </th>
+                                    <th class="sortable-header" data-sort="action" onclick="sortHistory('action')">
+                                        Action <span class="sort-icon" id="sort-icon-action">↕</span>
+                                    </th>
+                                    <th class="sortable-header" data-sort="ticker" onclick="sortHistory('ticker')">
+                                        Ticker <span class="sort-icon" id="sort-icon-ticker">↕</span>
+                                    </th>
                                     <th>Qty</th>
-                                    <th>Price</th>
-                                    <th>Status</th>
+                                    <th style="text-align:right">Buy Price</th>
+                                    <th style="text-align:right">Sell Price</th>
+                                    <th class="sortable-header" data-sort="pnl" onclick="sortHistory('pnl')" style="text-align:right">
+                                        P&L <span class="sort-icon" id="sort-icon-pnl">↕</span>
+                                    </th>
+                                    <th class="sortable-header" data-sort="status" onclick="sortHistory('status')">
+                                        Status <span class="sort-icon" id="sort-icon-status">↕</span>
+                                    </th>
+                                    <th>Result</th>
                                 </tr>
                             </thead>
                             <tbody id="history-table-body">
                                 <tr>
-                                    <td colspan="6" style="text-align:center; padding:20px;">Loading...</td>
+                                    <td colspan="9" style="text-align:center; padding:20px;">Loading...</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -239,7 +255,7 @@
 
         </main>
     </div>
-    <script src="/static/app.js"></script>
+    <script src="/static/app.js?v=5"></script>
     <script>
         lucide.createIcons();
     </script>

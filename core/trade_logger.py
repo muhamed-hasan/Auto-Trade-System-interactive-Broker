@@ -24,26 +24,23 @@ class TradeLogger:
         asyncio.create_task(self._process_exec_details(trade, fill))
 
     async def _process_order_status(self, trade: IBTrade):
-        # Update or Insert order in DB
-        # Use ib_order_id (trade.order.orderId)
-        # Check if exists (not implemented in DB yet, need query by ib_order_id)
-        # For MVP: We only log initial order in 'log_order'.
-        # But here we get updates. So we need `update_order_status` in DB.
-        # And if not exists? Assume logged by main flow or insert here?
-        # Safer to insert if missing.
-        
+        """Update order status in DB when IB sends status events."""
         try:
-             # Just update via log_order (insert or ignore? DB doesn't have UNIQUE on ib_order_id yet)
-             # Let's assume main loop logs initial order.
-             # We just update status.
-             # But we need row ID? No, we can update by ib_order_id.
-             # I need to add `update_order_by_ib_id` to Database.
-             # For now, let's just log every status change as a new row? No, that spams.
-             # Let's implement `update_order(ib_order_id, ...)` in DB.
-             # Since I can't modify DB.py easily without rewrite, I will use `log_order` for now or assume implemented.
-             # Wait, I defined `update_order_status` taking `order_id` (internal ID).
-             # I should change DB to support `ib_order_id`.
-             pass
+            ib_order_id = trade.order.orderId
+            status = trade.orderStatus.status
+            filled_qty = trade.orderStatus.filled
+            avg_fill_price = trade.orderStatus.avgFillPrice
+
+            fill_price = avg_fill_price if avg_fill_price and avg_fill_price > 0 else None
+            filled = filled_qty if filled_qty and filled_qty > 0 else None
+
+            await self.db.update_order_by_ib_id(
+                ib_order_id=ib_order_id,
+                status=status,
+                filled_qty=filled,
+                fill_price=fill_price
+            )
+            logger.info(f"Order {ib_order_id} status updated: {status} (fill: {fill_price})")
         except Exception as e:
             logger.error(f"Error processing order status: {e}")
 

@@ -75,6 +75,9 @@ class Database:
              if fill_price is not None:
                  updates.append("fill_price = ?")
                  params.append(fill_price)
+             if status == 'Filled':
+                 updates.append("filled_at = ?")
+                 params.append(datetime.now())
              
              params.append(ib_order_id)
              
@@ -183,5 +186,12 @@ class Database:
             # Using simple date comparison.
             query = "SELECT * FROM orders WHERE date(created_at) = date('now') ORDER BY id DESC"
             async with db.execute(query) as cursor:
+                rows = await cursor.fetchall()
+                return [dict(row) for row in rows]
+
+    async def get_recent_trades(self, limit: int = 100):
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute("SELECT * FROM trades ORDER BY id DESC LIMIT ?", (limit,)) as cursor:
                 rows = await cursor.fetchall()
                 return [dict(row) for row in rows]

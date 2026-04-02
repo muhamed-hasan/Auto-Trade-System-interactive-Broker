@@ -199,8 +199,86 @@ class WebServer:
     async def handle_history(self, request):
         try:
             orders = await self.db.get_todays_orders()
-            return web.json_response(orders)
+            trades_data = await self.db.get_recent_trades(limit=100)
+            
+            # Build a lookup of trades by ticker for P&L data
+            trades_by_ticker = {}
+            for t in trades_data:
+                ticker = t.get('ticker', '')
+                if ticker not in trades_by_ticker:
+                    trades_by_ticker[ticker] = []
+                trades_by_ticker[ticker].append(t)
+            
+            # Pair buy/sell orders per ticker to compute P&L
+            # Group orders by ticker
+            ticker_orders = {}
+            for o in orders:
+                ticker = o.get('ticker', '')
+                if ticker not in ticker_orders:
+                    ticker_orders[ticker] = {'buys': [], 'sells': []}
+                if o.get('action') == 'buy':
+                    ticker_orders[ticker]['buys'].append(o)
+                else:
+                    ticker_orders[ticker]['sells'].append(o)
+            
+            # Enrich each order with buy_price, sell_price, pnl_usd, result
+            enriched = []
+            for o in orders:
+                ticker = o.get('ticker', '')
+                action = o.get('action', '')
+                qty = o.get('quantity', 0)
+                fill_price = o.get('fill_price')
+                
+                entry = dict(o)
+                entry['buy_price'] = None
+                entry['sell_price'] = None
+                entry['pnl_usd'] = None
+                entry['result'] = None
+                
+                pair = ticker_orders.get(ticker, {})
+                
+                if action == 'buy' and fill_price:
+                    entry['buy_price'] = fill_price
+                    # Find matching sell for this ticker
+                    for s in pair.get('sells', []):
+                        if s.get('fill_price'):
+                            entry['sell_price'] = s['fill_price']
+                            pnl = (s['fill_price'] - fill_price) * qty
+                            entry['pnl_usd'] = round(pnl, 2)
+                            entry['result'] = 'WIN' if pnl > 0 else 'LOSS' if pnl < 0 else 'BREAK EVEN'
+                            break
+                elif action == 'sell' and fill_price:
+                    entry['sell_price'] = fill_price
+                    # Find matching buy
+                    for b in pair.get('buys', []):
+                        if b.get('fill_price'):
+                            entry['buy_price'] = b['fill_price']
+                            pnl = (fill_price - b['fill_price']) * qty
+                            entry['pnl_usd'] = round(pnl, 2)
+                            entry['result'] = 'WIN' if pnl > 0 else 'LOSS' if pnl < 0 else 'BREAK EVEN'
+                            break
+                
+                # If no pair found but order is filled, mark as OPEN
+                if entry['result'] is None and o.get('status') == 'Filled':
+                    entry['result'] = 'OPEN'
+                
+                # Also check trades table for realized PnL
+                if entry['pnl_usd'] is None and ticker in trades_by_ticker:
+                    for t in trades_by_ticker[ticker]:
+                        if t.get('pnl') and t['pnl'] != 0:
+                            entry['pnl_usd'] = round(t['pnl'], 2)
+                            entry['result'] = 'WIN' if t['pnl'] > 0 else 'LOSS'
+                            if t.get('entry_price') and t['entry_price'] > 0:
+                                entry['buy_price'] = entry['buy_price'] or t['entry_price']
+                            if t.get('exit_price') and t['exit_price'] > 0:
+                                entry['sell_price'] = entry['sell_price'] or t['exit_price']
+                            break
+                
+                enriched.append(entry)
+            
+            return web.json_response(enriched)
         except Exception as e:
+            logger.error(f"History API error: {e}")
             return web.json_response({"error": str(e)}, status=500)
 
     async def handle_status(self, request):

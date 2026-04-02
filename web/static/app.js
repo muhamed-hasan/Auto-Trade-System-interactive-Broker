@@ -24,6 +24,23 @@ async function updateDashboard() {
         renderPositionsList(positions);
         renderPendingOrders(openOrders);
         renderLogs(activity);
+        
+        // Update Telegram Strat Info
+        const tgDesc = document.getElementById("telegram-strat-desc");
+        const tgStatusCard = document.getElementById("telegram-strat-status-badge");
+        if (tgDesc && status.telegram) {
+            tgDesc.innerHTML = `<span style="color:var(--accent-green); font-weight:bold;">● Connected</span> | Bot: @${status.telegram.bot_name} | Ch: ${status.telegram.channel_title}`;
+            if (tgStatusCard) {
+                tgStatusCard.innerText = "ACTIVE";
+                tgStatusCard.className = "strat-status status-running";
+            }
+        } else if (tgDesc) {
+            tgDesc.innerHTML = `<span style="color:var(--accent-red); font-weight:bold;">● Disconnected</span> | Retrying...`;
+            if (tgStatusCard) {
+                tgStatusCard.innerText = "OFFLINE";
+                tgStatusCard.className = "strat-status status-idle";
+            }
+        }
 
     } catch (e) {
         console.error("Dashboard Sync Error:", e);

@@ -289,12 +289,28 @@ class WebServer:
             market_status = await self.executor.get_market_status()
             market_indices = await self.executor.get_market_indices()
             
+            if self.trading_bot and self.trading_bot.app and self.trading_bot.app.bot and not getattr(self, '_telegram_info', None):
+                try:
+                    me = await self.trading_bot.app.bot.get_me()
+                    bot_name = me.username  or me.first_name
+                    channel_title = str(settings.TELEGRAM_CHANNEL_ID)
+                    if settings.TELEGRAM_CHANNEL_ID:
+                        try:
+                            chat = await self.trading_bot.app.bot.get_chat(settings.TELEGRAM_CHANNEL_ID)
+                            channel_title = chat.title or chat.username or str(settings.TELEGRAM_CHANNEL_ID)
+                        except Exception:
+                            pass
+                    self._telegram_info = {"bot_name": bot_name, "channel_title": channel_title}
+                except Exception as e:
+                    logger.debug(f"Telegram status error: {e}")
+            
             return web.json_response({
                 "trading_status": trading_status,
                 "ib_connected": ib_connected,
                 "mode": settings.TRADING_MODE,
                 "market_status": market_status,
-                "indices": market_indices
+                "indices": market_indices,
+                "telegram": getattr(self, '_telegram_info', None)
             })
         except Exception as e:
             return web.json_response({"error": str(e)}, status=500)

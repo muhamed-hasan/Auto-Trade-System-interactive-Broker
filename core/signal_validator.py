@@ -15,7 +15,7 @@ SIGNAL_SCHEMA = {
         "action": {"type": "string", "enum": ["buy", "sell", "exit"]},
         "quantity": {"type": ["number", "string"]},
         "trade_power": {"type": ["number", "string"]}, # Added trade_power
-        "price": {"type": "number"},
+        "price": {"type": ["number", "string"]},
         "msg": {"type": "string"},
         "order_type": {"type": "string", "enum": ["market", "limit"]},
         "type": {"type": "string"},
@@ -76,6 +76,12 @@ def validate_signal(raw_json: str) -> Signal:
     if not quantity and not trade_power:
          raise ValueError("Must provide either 'quantity' or 'trade_power'")
 
+    raw_price = data.get("price")
+    try:
+        parsed_price = float(raw_price) if raw_price is not None else None
+    except ValueError:
+        raise ValueError(f"Invalid price format: {raw_price}")
+
     # Create Signal object
     return Signal(
         ticker=data["ticker"].upper(),
@@ -83,7 +89,7 @@ def validate_signal(raw_json: str) -> Signal:
         quantity=quantity,
         trade_power=str(trade_power) if trade_power else None,
         order_type=data.get("order_type", "market"),
-        price=data.get("price"),
+        price=parsed_price,
         msg=data.get("msg"),
         raw_json=raw_json
     )

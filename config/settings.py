@@ -6,6 +6,29 @@ from dotenv import load_dotenv
 env_path = Path(__file__).parent / '.env'
 load_dotenv(dotenv_path=env_path)
 
+def update_env_variable(key, value):
+    if not env_path.exists():
+        env_path.touch()
+    
+    with open(env_path, 'r') as f:
+        lines = f.readlines()
+        
+    key_found = False
+    for i, line in enumerate(lines):
+        if line.startswith(f"{key}="):
+            lines[i] = f"{key}={value}\n"
+            key_found = True
+            break
+            
+    if not key_found:
+        lines.append(f"{key}={value}\n")
+        
+    with open(env_path, 'w') as f:
+        f.writelines(lines)
+
+# --- Trading Mode ---
+DEFAULT_TRADE_POWER = float(os.getenv("DEFAULT_TRADE_POWER", "4000"))
+
 # --- Project Paths ---
 BASE_DIR = Path(__file__).parent.parent
 DB_PATH = BASE_DIR / "trading_bot.db"

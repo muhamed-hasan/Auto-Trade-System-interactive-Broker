@@ -11,8 +11,8 @@ SIGNAL_SCHEMA = {
     "type": "object",
     "properties": {
         "ticker": {"type": "string"},
-        "signal": {"type": "string", "enum": ["buy", "sell"]},
-        "action": {"type": "string", "enum": ["buy", "sell"]},
+        "signal": {"type": "string", "enum": ["buy", "sell", "exit"]},
+        "action": {"type": "string", "enum": ["buy", "sell", "exit"]},
         "quantity": {"type": ["number", "string"]},
         "trade_power": {"type": ["number", "string"]}, # Added trade_power
         "price": {"type": "number"},
@@ -56,12 +56,22 @@ def validate_signal(raw_json: str) -> Signal:
         raise ValueError("Missing 'action' or 'signal' field")
     
     action = action.lower()
-    if action not in ["buy", "sell"]:
+    if action not in ["buy", "sell", "exit"]:
          raise ValueError(f"Invalid action: {action}")
+    
+    if action == "exit":
+        action = "sell"
+        data["quantity"] = data.get("quantity", "100%")
     
     # Check for quantity OR trade_power
     quantity = data.get("quantity")
     trade_power = data.get("trade_power")
+    
+    if isinstance(trade_power, str) and trade_power.upper() == "N/A":
+        trade_power = None
+        
+    if action == "buy" and not quantity and not trade_power:
+        trade_power = settings.DEFAULT_TRADE_POWER
     
     if not quantity and not trade_power:
          raise ValueError("Must provide either 'quantity' or 'trade_power'")

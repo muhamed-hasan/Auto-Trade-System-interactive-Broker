@@ -100,6 +100,20 @@
                         --:--
                     </div>
                 </div>
+
+                <!-- Settings -->
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title"><i data-lucide="settings" width="16" style="margin-right:8px; vertical-align:middle;"></i> Settings</span>
+                    </div>
+                    <div style="margin-top: 10px;">
+                        <label for="default-trade-power" style="font-size: 0.8rem; color: var(--text-secondary); display: block; margin-bottom: 5px;">Default Trade Power ($)</label>
+                        <div style="display: flex; gap: 8px;">
+                            <input type="number" id="default-trade-power" style="flex: 1; background: #0f172a; border: 1px solid #334155; color: white; padding: 6px 10px; border-radius: 4px; font-family: var(--font-mono);" placeholder="4000">
+                            <button onclick="updateTradePower()" style="background: var(--accent-blue); border: none; color: white; padding: 6px 12px; border-radius: 4px; cursor: pointer;">Save</button>
+                        </div>
+                    </div>
+                </div>
             </section>
 
             <!-- MIDDLE COLUMN: Active Positions & Strategies -->

@@ -41,6 +41,12 @@ async function updateDashboard() {
                 tgStatusCard.className = "strat-status status-idle";
             }
         }
+        
+        // Update default trade power input if not focused
+        const tpInput = document.getElementById("default-trade-power");
+        if (tpInput && document.activeElement !== tpInput && status.default_trade_power !== undefined) {
+             tpInput.value = status.default_trade_power;
+        }
 
     } catch (e) {
         console.error("Dashboard Sync Error:", e);
@@ -531,6 +537,33 @@ function formatCurrency(num) {
         currency: 'USD',
         minimumFractionDigits: 2
     }).format(num);
+}
+
+async function updateTradePower() {
+    const input = document.getElementById("default-trade-power");
+    if (!input || !input.value) return;
+    
+    const val = parseFloat(input.value);
+    if (isNaN(val) || val <= 0) {
+        alert("Please enter a valid amount.");
+        return;
+    }
+    
+    try {
+        const res = await fetch(`${API_BASE}/settings/trade_power`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ trade_power: val })
+        });
+        const data = await res.json();
+        if (data.status === 'success') {
+            alert("Default Trade Power saved successfully.");
+        } else {
+            alert("Failed to save: " + (data.error || "Unknown"));
+        }
+    } catch (e) {
+        alert("Error saving trade power: " + e);
+    }
 }
 
 // Init

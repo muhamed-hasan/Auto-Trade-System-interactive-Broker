@@ -37,6 +37,7 @@ class WebServer:
         self.app.router.add_post('/api/orders/cancel', self.handle_cancel_order)
         self.app.router.add_get('/api/history', self.handle_history)
         self.app.router.add_get('/api/status', self.handle_status)
+        self.app.router.add_post('/api/settings/trade_power', self.handle_update_trade_power)
         self.app.router.add_post('/api/shutdown', self.handle_shutdown)
         
         # TradingView Webhook endpoint - receives signals directly via HTTP POST
@@ -71,6 +72,21 @@ class WebServer:
                  callback()
                  
         return web.json_response({"status": "shutting_down", "message": "System is stopping..."})
+
+    async def handle_update_trade_power(self, request):
+        try:
+            data = await request.json()
+            power = data.get("trade_power")
+            if not power:
+                return web.json_response({"error": "Missing trade_power"}, status=400)
+            
+            new_power = float(power)
+            settings.DEFAULT_TRADE_POWER = new_power
+            settings.update_env_variable("DEFAULT_TRADE_POWER", str(new_power))
+            
+            return web.json_response({"status": "success", "trade_power": new_power})
+        except Exception as e:
+            return web.json_response({"error": str(e)}, status=500)
 
     async def handle_index(self, request):
         return web.FileResponse('./web/static/index.html')
@@ -310,7 +326,8 @@ class WebServer:
                 "mode": settings.TRADING_MODE,
                 "market_status": market_status,
                 "indices": market_indices,
-                "telegram": getattr(self, '_telegram_info', None)
+                "telegram": getattr(self, '_telegram_info', None),
+                "default_trade_power": getattr(settings, 'DEFAULT_TRADE_POWER', 4000)
             })
         except Exception as e:
             return web.json_response({"error": str(e)}, status=500)

@@ -23,6 +23,7 @@ class OrderExecutor:
         self._account_cache = None
         self._account_cache_time = 0
         self._account_cache_ttl = 5  # seconds
+        self._account_summary_lock = asyncio.Lock()
         # Track suppressed errors to avoid log spam
         self._vix_error_logged = False
 
@@ -317,31 +318,32 @@ class OrderExecutor:
         if not self.ib.isConnected():
              await self.connect()
 
-        # Return cached data if still fresh (prevents Error 322: max account summary requests)
-        now = time.time()
-        if self._account_cache and (now - self._account_cache_time) < self._account_cache_ttl:
-            return self._account_cache
-             
-        try:
-            tags = await self.ib.accountSummaryAsync()
-        except Exception: # If lost connection during call
-            # Return stale cache if available, otherwise try reconnect
-            if self._account_cache:
+        async with self._account_summary_lock:
+            # Return cached data if still fresh (prevents Error 322: max account summary requests)
+            now = time.time()
+            if self._account_cache and (now - self._account_cache_time) < self._account_cache_ttl:
                 return self._account_cache
-            await self.connect()
-            tags = await self.ib.accountSummaryAsync()
+                 
+            try:
+                tags = await self.ib.accountSummaryAsync()
+            except Exception: # If lost connection during call
+                # Return stale cache if available, otherwise try reconnect
+                if self._account_cache:
+                    return self._account_cache
+                await self.connect()
+                tags = await self.ib.accountSummaryAsync()
 
-        # Log all available tags for debugging
-        logger.debug(f"Available account summary tags: {[t.tag for t in tags]}")
-        
-        summary = {t.tag: float(t.value) for t in tags if t.tag in ['NetLiquidation', 'BuyingPower', 'TotalCashValue', 'UnrealizedPnL', 'RealizedPnL', 'DailyPnL']}
-        logger.debug(f"Account summary P&L values: RealizedPnL={summary.get('RealizedPnL', 'N/A')}, DailyPnL={summary.get('DailyPnL', 'N/A')}, UnrealizedPnL={summary.get('UnrealizedPnL', 'N/A')}")
-        
-        # Update cache
-        self._account_cache = summary
-        self._account_cache_time = now
-        
-        return summary
+            # Log all available tags for debugging
+            logger.debug(f"Available account summary tags: {[t.tag for t in tags]}")
+            
+            summary = {t.tag: float(t.value) for t in tags if t.tag in ['NetLiquidation', 'BuyingPower', 'TotalCashValue', 'UnrealizedPnL', 'RealizedPnL', 'DailyPnL']}
+            logger.debug(f"Account summary P&L values: RealizedPnL={summary.get('RealizedPnL', 'N/A')}, DailyPnL={summary.get('DailyPnL', 'N/A')}, UnrealizedPnL={summary.get('UnrealizedPnL', 'N/A')}")
+            
+            # Update cache
+            self._account_cache = summary
+            self._account_cache_time = now
+            
+            return summary
 
     async def get_daily_pnl(self) -> dict:
         """

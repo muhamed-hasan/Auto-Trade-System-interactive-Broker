@@ -19,7 +19,17 @@ class UnifiedBot:
         self.risk_engine = risk_engine
         self.executor = order_executor
         self.db = db
-        self.app = Application.builder().token(token).build()
+        # Configure application with increased timeouts to prevent httpx.ReadError
+        self.app = (
+            Application.builder()
+            .token(token)
+            .read_timeout(30)
+            .write_timeout(30)
+            .connect_timeout(30)
+            .pool_timeout(10.0)
+            .get_updates_read_timeout(42)
+            .build()
+        )
         
         # Whitelist filter for control commands
         whitelist_filter = filters.User(user_id=settings.TELEGRAM_WHITELIST_IDS)

@@ -3,6 +3,7 @@ import logging
 from jsonschema import validate, ValidationError
 from db.models import Signal
 from config.settings import REQUIRED_SIGNAL_KEYS
+from config import settings
 
 logger = logging.getLogger(__name__)
 

@@ -48,6 +48,12 @@ async function updateDashboard() {
              tpInput.value = status.default_trade_power;
         }
 
+        // Update auto-close EOD toggle
+        const eodToggle = document.getElementById("auto-close-eod");
+        if (eodToggle && status.auto_close_signals_eod !== undefined) {
+            eodToggle.checked = status.auto_close_signals_eod;
+        }
+
     } catch (e) {
         console.error("Dashboard Sync Error:", e);
     }
@@ -259,6 +265,31 @@ async function closeAllPositions() {
     } catch (e) {
         console.error(e);
         alert("Failed to send close all request");
+    }
+}
+
+async function toggleEODClose() {
+    const el = document.getElementById("auto-close-eod");
+    if (!el) return;
+    
+    const enabled = el.checked;
+    try {
+        const response = await fetch('/api/settings/auto_close_eod', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ enabled: enabled })
+        });
+        
+        if (response.ok) {
+            console.log("EOD close signals setting updated to", enabled);
+            // alert(`EOD Auto-Close ${enabled ? 'Enabled' : 'Disabled'}`);
+        } else {
+            console.error("Failed to update EOD setting");
+            el.checked = !enabled; // revert on fail
+        }
+    } catch (e) {
+        console.error("Error toggling EOD setting:", e);
+        el.checked = !enabled; // revert on fail
     }
 }
 

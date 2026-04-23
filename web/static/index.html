@@ -113,6 +113,14 @@
                             <button onclick="updateTradePower()" style="background: var(--accent-blue); border: none; color: white; padding: 6px 12px; border-radius: 4px; cursor: pointer;">Save</button>
                         </div>
                     </div>
+                    <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #334155; display: flex; align-items: center; justify-content: space-between;">
+                        <label for="auto-close-eod" style="font-size: 0.8rem; color: #94a3b8; cursor: pointer;" title="Automatically close open positions opened by signals today (15 mins before market close)">
+                            Auto-Close Today's Signal Positions (EOD)
+                        </label>
+                        <div style="display: flex; align-items: center;">
+                            <input type="checkbox" id="auto-close-eod" onchange="toggleEODClose()" style="width: 16px; height: 16px; cursor: pointer; accent-color: var(--accent-blue);">
+                        </div>
+                    </div>
                 </div>
             </section>
 

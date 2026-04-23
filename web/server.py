@@ -38,6 +38,7 @@ class WebServer:
         self.app.router.add_get('/api/history', self.handle_history)
         self.app.router.add_get('/api/status', self.handle_status)
         self.app.router.add_post('/api/settings/trade_power', self.handle_update_trade_power)
+        self.app.router.add_post('/api/settings/auto_close_eod', self.handle_update_auto_close_eod)
         self.app.router.add_post('/api/shutdown', self.handle_shutdown)
         
         # TradingView Webhook endpoint - receives signals directly via HTTP POST
@@ -85,6 +86,19 @@ class WebServer:
             settings.update_env_variable("DEFAULT_TRADE_POWER", str(new_power))
             
             return web.json_response({"status": "success", "trade_power": new_power})
+        except Exception as e:
+            return web.json_response({"error": str(e)}, status=500)
+
+    async def handle_update_auto_close_eod(self, request):
+        try:
+            data = await request.json()
+            enabled = data.get("enabled")
+            if enabled is None:
+                return web.json_response({"error": "Missing enabled flag"}, status=400)
+            
+            val_str = "true" if enabled else "false"
+            await self.db.set_system_state("auto_close_signals_eod", val_str)
+            return web.json_response({"status": "success", "auto_close_signals_eod": enabled})
         except Exception as e:
             return web.json_response({"error": str(e)}, status=500)
 
@@ -320,6 +334,9 @@ class WebServer:
                 except Exception as e:
                     logger.debug(f"Telegram status error: {e}")
             
+            auto_close = await self.db.get_system_state("auto_close_signals_eod")
+            auto_close_bool = str(auto_close).lower() == "true"
+            
             return web.json_response({
                 "trading_status": trading_status,
                 "ib_connected": ib_connected,
@@ -327,7 +344,8 @@ class WebServer:
                 "market_status": market_status,
                 "indices": market_indices,
                 "telegram": getattr(self, '_telegram_info', None),
-                "default_trade_power": getattr(settings, 'DEFAULT_TRADE_POWER', 4000)
+                "default_trade_power": getattr(settings, 'DEFAULT_TRADE_POWER', 4000),
+                "auto_close_signals_eod": auto_close_bool
             })
         except Exception as e:
             return web.json_response({"error": str(e)}, status=500)

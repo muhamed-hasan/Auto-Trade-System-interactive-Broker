@@ -472,6 +472,76 @@ class OrderExecutor:
         logger.warning(f"No open position found for {symbol} to close.")
         return False
 
+    async def close_todays_signal_positions(self, db):
+        """
+        Close exactly the net quantity acquired today from signals, 
+        ignoring positions held from previous days or manual trades.
+        """
+        logger.info("Starting EOD auto-close for today's signal positions.")
+        if not self.ib.isConnected():
+            await self.connect()
+
+        orders = await db.get_todays_orders()
+        
+        # Calculate net quantity acquired today per ticker
+        # Long position increases with 'buy', short increases with 'sell'.
+        # Assuming our 'quantity' is absolute.
+        signal_net_pos = {}
+        for o in orders:
+            if o['status'] in ['Filled', 'Submitted', 'PreSubmitted']:
+                ticker = o['ticker']
+                qty = float(o['quantity'])
+                if o['action'] == 'buy':
+                    signal_net_pos[ticker] = signal_net_pos.get(ticker, 0) + qty
+                elif o['action'] == 'sell':
+                    signal_net_pos[ticker] = signal_net_pos.get(ticker, 0) - qty
+
+        if not signal_net_pos:
+            logger.info("No signal orders filled today. Nothing to close.")
+            return []
+
+        # Get current actual positions
+        current_positions = await self.get_all_positions()
+        pos_map = {p.contract.symbol: p for p in current_positions if p.position != 0}
+
+        actions_taken = []
+        for ticker, net_qty in signal_net_pos.items():
+            if net_qty == 0:
+                continue
+
+            current_pos = pos_map.get(ticker)
+            if not current_pos:
+                logger.info(f"Signal net pos for {ticker} is {net_qty}, but no open position in IB.")
+                continue
+
+            actual_qty = current_pos.position
+
+            # Determine amount to close
+            close_qty = 0
+            action = None
+            if net_qty > 0 and actual_qty > 0:
+                # We bought, and we have a long position. Sell the overlapping amount.
+                close_qty = min(net_qty, actual_qty)
+                action = 'SELL'
+            elif net_qty < 0 and actual_qty < 0:
+                # We shorted, and we are net short. Buy the overlapping amount.
+                close_qty = min(abs(net_qty), abs(actual_qty))
+                action = 'BUY'
+
+            if close_qty > 0 and action:
+                logger.info(f"EOD Signal Close: {ticker} -> {action} {close_qty} (Signal Net: {net_qty}, Total Open: {actual_qty})")
+                contract = current_pos.contract
+                order = MarketOrder(action, close_qty)
+                trade = self.ib.placeOrder(contract, order)
+                actions_taken.append({
+                    "ticker": ticker,
+                    "action": action,
+                    "quantity": close_qty,
+                    "trade": trade
+                })
+
+        return actions_taken
+
     async def get_market_status(self):
         """
         Check if the market is open using SPY contract details.

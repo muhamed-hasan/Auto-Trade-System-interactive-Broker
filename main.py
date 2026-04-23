@@ -52,6 +52,47 @@ trade_register_logger.addHandler(trade_handler)
 # Use the root logger for the main script
 logger = logging.getLogger(__name__)
 
+async def eod_close_worker(db, order_executor):
+    """
+    Background worker that checks once per minute if we have reached
+    15 minutes before the configured market close. If EOD auto-close
+    is enabled, it triggers the signal positions close logic.
+    """
+    logger.info("EOD Close Worker initialized.")
+    from datetime import datetime, timezone
+    while True:
+        try:
+            # Check every minute, but we only want to fire once
+            now = datetime.now(timezone.utc)
+            target_hour = settings.MARKET_CLOSE_HOUR - 1
+            target_minute = 45
+
+            if now.hour == target_hour and now.minute == target_minute:
+                # Check status
+                auto_close = await db.get_system_state("auto_close_signals_eod")
+                trading_status = await db.get_system_state("trading_status")
+                
+                if str(auto_close).lower() == "true" and trading_status != "paused":
+                    logger.info("Triggering automatic EOD close for today's signal positions.")
+                    actions = await order_executor.close_todays_signal_positions(db)
+                    
+                    if actions:
+                        logger.info(f"EOD Auto-close submitted {len(actions)} orders.")
+                    else:
+                        logger.info("EOD Auto-close found no signal positions to close.")
+                
+                # Sleep enough to prevent triggering twice in the same minute
+                await asyncio.sleep(60)
+            else:
+                await asyncio.sleep(30)
+                
+        except asyncio.CancelledError:
+            logger.info("EOD Close Worker shutting down...")
+            break
+        except Exception as e:
+            logger.error(f"Error in EOD Close Worker: {e}")
+            await asyncio.sleep(30)
+
 async def main():
     logger.info("Starting AutoTrading System...")
     
@@ -107,6 +148,9 @@ async def main():
         # Start the Telegram bot in the background so it doesn't block the UI server 
         # from responding to account data requests if Telegram network is currently failing.
         asyncio.create_task(trading_bot.start())
+        
+        # Start EOD Close worker
+        asyncio.create_task(eod_close_worker(db, order_executor))
         
         logger.info("System Online. Press Ctrl+C to stop.")
         

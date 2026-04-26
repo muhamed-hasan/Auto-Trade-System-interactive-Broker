@@ -114,10 +114,12 @@
                         </div>
                     </div>
                     <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #334155; display: flex; align-items: center; justify-content: space-between;">
-                        <label for="auto-close-eod" style="font-size: 0.8rem; color: #94a3b8; cursor: pointer;" title="Automatically close open positions opened by signals today (15 mins before market close)">
-                            Auto-Close Today's Signal Positions (EOD)
+                        <label for="auto-close-eod" style="font-size: 0.8rem; color: #94a3b8; cursor: pointer;" title="Automatically close all open positions before market close">
+                            Auto-Close All Positions (EOD)
                         </label>
-                        <div style="display: flex; align-items: center;">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <input type="number" id="auto-close-time" onchange="toggleEODClose()" style="width: 45px; background: #0f172a; border: 1px solid #334155; color: white; padding: 2px 4px; border-radius: 4px; font-family: var(--font-mono); font-size: 0.8rem; text-align: center;" value="5" title="Minutes before market close">
+                            <span style="font-size: 0.75rem; color: #94a3b8; margin-right: 4px;">min</span>
                             <input type="checkbox" id="auto-close-eod" onchange="toggleEODClose()" style="width: 16px; height: 16px; cursor: pointer; accent-color: var(--accent-blue);">
                         </div>
                     </div>

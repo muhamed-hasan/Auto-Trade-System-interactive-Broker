@@ -48,10 +48,14 @@ async function updateDashboard() {
              tpInput.value = status.default_trade_power;
         }
 
-        // Update auto-close EOD toggle
+        // Update auto-close EOD toggle and time
         const eodToggle = document.getElementById("auto-close-eod");
         if (eodToggle && status.auto_close_signals_eod !== undefined) {
             eodToggle.checked = status.auto_close_signals_eod;
+        }
+        const eodTimeInput = document.getElementById("auto-close-time");
+        if (eodTimeInput && status.auto_close_time_minutes !== undefined && document.activeElement !== eodTimeInput) {
+            eodTimeInput.value = status.auto_close_time_minutes;
         }
 
     } catch (e) {
@@ -270,14 +274,17 @@ async function closeAllPositions() {
 
 async function toggleEODClose() {
     const el = document.getElementById("auto-close-eod");
+    const timeEl = document.getElementById("auto-close-time");
     if (!el) return;
     
     const enabled = el.checked;
+    const timeMinutes = timeEl ? parseInt(timeEl.value) || 5 : 5;
+    
     try {
         const response = await fetch('/api/settings/auto_close_eod', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ enabled: enabled })
+            body: JSON.stringify({ enabled: enabled, time_minutes: timeMinutes })
         });
         
         if (response.ok) {

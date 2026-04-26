@@ -444,8 +444,10 @@ class OrderExecutor:
         return False
 
     async def close_all_positions(self):
-        positions = self.ib.positions()
+        positions = await self.get_all_positions()
         for pos in positions:
+            if pos.position == 0:
+                continue
             contract = pos.contract
             action = 'SELL' if pos.position > 0 else 'BUY'
             order = MarketOrder(action, abs(pos.position))

@@ -93,12 +93,14 @@ class WebServer:
         try:
             data = await request.json()
             enabled = data.get("enabled")
+            time_minutes = data.get("time_minutes", 5)
             if enabled is None:
                 return web.json_response({"error": "Missing enabled flag"}, status=400)
             
             val_str = "true" if enabled else "false"
             await self.db.set_system_state("auto_close_signals_eod", val_str)
-            return web.json_response({"status": "success", "auto_close_signals_eod": enabled})
+            await self.db.set_system_state("auto_close_time_minutes", str(time_minutes))
+            return web.json_response({"status": "success", "auto_close_signals_eod": enabled, "auto_close_time_minutes": time_minutes})
         except Exception as e:
             return web.json_response({"error": str(e)}, status=500)
 
@@ -336,6 +338,8 @@ class WebServer:
             
             auto_close = await self.db.get_system_state("auto_close_signals_eod")
             auto_close_bool = str(auto_close).lower() == "true"
+            auto_close_time = await self.db.get_system_state("auto_close_time_minutes")
+            auto_close_time_minutes = int(auto_close_time) if auto_close_time else 5
             
             return web.json_response({
                 "trading_status": trading_status,
@@ -345,7 +349,8 @@ class WebServer:
                 "indices": market_indices,
                 "telegram": getattr(self, '_telegram_info', None),
                 "default_trade_power": getattr(settings, 'DEFAULT_TRADE_POWER', 4000),
-                "auto_close_signals_eod": auto_close_bool
+                "auto_close_signals_eod": auto_close_bool,
+                "auto_close_time_minutes": auto_close_time_minutes
             })
         except Exception as e:
             return web.json_response({"error": str(e)}, status=500)

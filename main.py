@@ -64,8 +64,19 @@ async def eod_close_worker(db, order_executor):
         try:
             # Check every minute, but we only want to fire once
             now = datetime.now(timezone.utc)
-            target_hour = settings.MARKET_CLOSE_HOUR - 1
-            target_minute = 45
+            
+            auto_close_time_minutes_str = await db.get_system_state("auto_close_time_minutes")
+            if auto_close_time_minutes_str is None:
+                auto_close_time_minutes = 5
+            else:
+                try:
+                    auto_close_time_minutes = int(auto_close_time_minutes_str)
+                except ValueError:
+                    auto_close_time_minutes = 5
+
+            close_minute_total = settings.MARKET_CLOSE_HOUR * 60 - auto_close_time_minutes
+            target_hour = close_minute_total // 60
+            target_minute = close_minute_total % 60
 
             if now.hour == target_hour and now.minute == target_minute:
                 # Check status
@@ -73,13 +84,12 @@ async def eod_close_worker(db, order_executor):
                 trading_status = await db.get_system_state("trading_status")
                 
                 if str(auto_close).lower() == "true" and trading_status != "paused":
-                    logger.info("Triggering automatic EOD close for today's signal positions.")
-                    actions = await order_executor.close_todays_signal_positions(db)
-                    
-                    if actions:
-                        logger.info(f"EOD Auto-close submitted {len(actions)} orders.")
-                    else:
-                        logger.info("EOD Auto-close found no signal positions to close.")
+                    logger.info("Triggering automatic EOD close for all positions.")
+                    try:
+                        await order_executor.close_all_positions()
+                        logger.info("EOD Auto-close initiated for all positions.")
+                    except Exception as e:
+                        logger.error(f"Error during EOD Auto-close: {e}")
                 
                 # Sleep enough to prevent triggering twice in the same minute
                 await asyncio.sleep(60)

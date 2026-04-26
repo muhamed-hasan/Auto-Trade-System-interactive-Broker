@@ -172,7 +172,7 @@ body {
     grid-template-columns: 340px minmax(500px, 1fr) 380px;
     /* Adjusted column widths */
     gap: 24px;
-    height: 100%;
+    flex: 1;
     overflow: hidden;
     padding-bottom: 20px;
 }

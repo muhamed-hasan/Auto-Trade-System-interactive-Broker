@@ -6,6 +6,7 @@ from config.settings import REQUIRED_SIGNAL_KEYS
 from config import settings
 
 logger = logging.getLogger(__name__)
+raw_signal_logger = logging.getLogger('raw_signals')
 
 # JSON Schema for validation
 SIGNAL_SCHEMA = {
@@ -39,6 +40,8 @@ def validate_signal(raw_json: str) -> Signal:
     raw_json = raw_json.replace('\u2018', "'").replace('\u2019', "'")  # smart single quotes
     raw_json = raw_json.replace('\u00ab', '"').replace('\u00bb', '"')  # guillemets
     raw_json = raw_json.strip()
+    
+    raw_signal_logger.info(raw_json)
     
     try:
         data = json.loads(raw_json)

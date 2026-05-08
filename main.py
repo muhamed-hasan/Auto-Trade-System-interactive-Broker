@@ -52,48 +52,138 @@ trade_register_logger.addHandler(trade_handler)
 # Use the root logger for the main script
 logger = logging.getLogger(__name__)
 
-async def eod_close_worker(db, order_executor):
+# 5. Raw Signals Logger Setup
+raw_signal_logger = logging.getLogger('raw_signals')
+raw_signal_logger.setLevel(logging.INFO)
+raw_signal_logger.propagate = False 
+
+raw_signal_handler = logging.FileHandler('raw_signals.log')
+raw_signal_handler.setLevel(logging.INFO)
+raw_signal_formatter = logging.Formatter('%(message)s')
+raw_signal_handler.setFormatter(raw_signal_formatter)
+raw_signal_logger.addHandler(raw_signal_handler)
+
+
+async def ib_connection_worker(order_executor, web_server=None):
     """
-    Background worker that checks once per minute if we have reached
-    15 minutes before the configured market close. If EOD auto-close
+    Background worker that checks IB connection and retries every 5 minutes if disconnected.
+    """
+    logger.info("IB Connection Worker initialized. Will check connection every 5 minutes.")
+    while True:
+        try:
+            await asyncio.sleep(300) # 5 minutes
+            if not order_executor.ib.isConnected():
+                logger.warning("IB is disconnected. Attempting to reconnect...")
+                try:
+                    await order_executor.connect()
+                    if order_executor.ib.isConnected() and web_server:
+                        await web_server.send_telegram_notification("🟢 **IB Reconnected Successfully**")
+                except Exception as e:
+                    pass # Error already logged in connect()
+        except asyncio.CancelledError:
+            logger.info("IB Connection Worker shutting down...")
+            break
+        except Exception as e:
+            logger.error(f"Error in IB Connection Worker: {e}")
+            await asyncio.sleep(60)
+
+
+async def eod_close_worker(db, order_executor, web_server=None):
+    """
+    Background worker that checks once per minute if we are at the
+    configured minutes before the actual market close. If EOD auto-close
     is enabled, it triggers the signal positions close logic.
     """
     logger.info("EOD Close Worker initialized.")
-    from datetime import datetime, timezone
+    from datetime import datetime, timezone, timedelta
+    
+    last_closed_date = None
+
     while True:
         try:
-            # Check every minute, but we only want to fire once
             now = datetime.now(timezone.utc)
             
-            auto_close_time_minutes_str = await db.get_system_state("auto_close_time_minutes")
-            if auto_close_time_minutes_str is None:
-                auto_close_time_minutes = 5
-            else:
-                try:
-                    auto_close_time_minutes = int(auto_close_time_minutes_str)
-                except ValueError:
-                    auto_close_time_minutes = 5
-
-            close_minute_total = settings.MARKET_CLOSE_HOUR * 60 - auto_close_time_minutes
-            target_hour = close_minute_total // 60
-            target_minute = close_minute_total % 60
-
-            if now.hour == target_hour and now.minute == target_minute:
-                # Check status
-                auto_close = await db.get_system_state("auto_close_signals_eod")
-                trading_status = await db.get_system_state("trading_status")
+            auto_close = await db.get_system_state("auto_close_signals_eod")
+            trading_status = await db.get_system_state("trading_status")
+            
+            if str(auto_close).lower() != "true" or trading_status == "paused":
+                await asyncio.sleep(60)
+                continue
                 
-                if str(auto_close).lower() == "true" and trading_status != "paused":
+            auto_close_time_minutes_str = await db.get_system_state("auto_close_time_minutes")
+            try:
+                auto_close_time_minutes = int(auto_close_time_minutes_str) if auto_close_time_minutes_str else 5
+            except ValueError:
+                auto_close_time_minutes = 5
+                
+            market_close_time = await order_executor.get_market_close_time()
+            
+            if market_close_time is None:
+                # Fallback to hardcoded settings if no IB connection or data
+                close_minute_total = settings.MARKET_CLOSE_HOUR * 60 - auto_close_time_minutes
+                target_hour = close_minute_total // 60
+                target_minute = close_minute_total % 60
+                
+                if now.hour == target_hour and now.minute == target_minute:
+                    if last_closed_date != now.date():
+                        logger.info("Triggering automatic EOD close for all positions (Fallback Time).")
+                        last_closed_date = now.date()
+                        if web_server:
+                            msg = f"🔔 **EOD Auto-Close Triggered**\nMarket closes in {auto_close_time_minutes} minutes (Fallback Time).\nClosing today's signal positions..."
+                            await web_server.send_telegram_notification(msg)
+                            
+                        try:
+                            actions = await order_executor.close_todays_signal_positions(db)
+                            if web_server:
+                                if actions:
+                                    action_strs = [f"{a['action']} {a['quantity']} {a['ticker']}" for a in actions]
+                                    await web_server.send_telegram_notification(f"✅ Positions closed:\n" + "\n".join(action_strs))
+                                else:
+                                    await web_server.send_telegram_notification("ℹ️ No signal positions to close today.")
+                            logger.info("EOD Auto-close initiated.")
+                        except Exception as e:
+                            logger.error(f"Error during EOD Auto-close: {e}")
+                            if web_server:
+                                await web_server.send_telegram_notification(f"⚠️ Error during EOD Auto-close: {e}")
+                
+                await asyncio.sleep(60)
+                
+            else:
+                now_local = now.astimezone(market_close_time.tzinfo)
+                
+                # Reset if it's a new day
+                if last_closed_date != now_local.date():
+                    last_closed_date = None
+                    
+                if last_closed_date == now_local.date():
+                    await asyncio.sleep(60)
+                    continue
+                    
+                trigger_time = market_close_time - timedelta(minutes=auto_close_time_minutes)
+                
+                if trigger_time <= now_local < market_close_time:
                     logger.info("Triggering automatic EOD close for all positions.")
+                    last_closed_date = now_local.date()
+                    
+                    if web_server:
+                        msg = f"🔔 **EOD Auto-Close Triggered**\nMarket closes in {auto_close_time_minutes} minutes.\nClosing today's signal positions..."
+                        await web_server.send_telegram_notification(msg)
+                    
                     try:
-                        await order_executor.close_all_positions()
-                        logger.info("EOD Auto-close initiated for all positions.")
+                        actions = await order_executor.close_todays_signal_positions(db)
+                        if web_server:
+                            if actions:
+                                action_strs = [f"{a['action']} {a['quantity']} {a['ticker']}" for a in actions]
+                                await web_server.send_telegram_notification(f"✅ Positions closed:\n" + "\n".join(action_strs))
+                            else:
+                                await web_server.send_telegram_notification("ℹ️ No signal positions to close today.")
+                        logger.info("EOD Auto-close initiated.")
                     except Exception as e:
                         logger.error(f"Error during EOD Auto-close: {e}")
-                
-                # Sleep enough to prevent triggering twice in the same minute
-                await asyncio.sleep(60)
-            else:
+                        if web_server:
+                            await web_server.send_telegram_notification(f"⚠️ Error during EOD Auto-close: {e}")
+                            
+                # Sleep a bit shorter around trigger time to not miss it
                 await asyncio.sleep(30)
                 
         except asyncio.CancelledError:
@@ -160,7 +250,10 @@ async def main():
         asyncio.create_task(trading_bot.start())
         
         # Start EOD Close worker
-        asyncio.create_task(eod_close_worker(db, order_executor))
+        asyncio.create_task(eod_close_worker(db, order_executor, web_server=web_server))
+        
+        # Start IB Connection monitor
+        asyncio.create_task(ib_connection_worker(order_executor, web_server=web_server))
         
         logger.info("System Online. Press Ctrl+C to stop.")
         

@@ -669,3 +669,67 @@ class OrderExecutor:
         except Exception as e:
             logger.error(f"Error checking market status: {e}")
             return {"status": "error", "reason": str(e), "source": "error"}
+
+    async def get_market_close_time(self):
+        """
+        Returns the market close time as a timezone-aware datetime object for today,
+        or None if not available or market is closed all day.
+        """
+        if not self.ib.isConnected():
+            return None
+        
+        try:
+            contract = Stock('SPY', 'SMART', 'USD')
+            details_list = await self.ib.reqContractDetailsAsync(contract)
+            if not details_list:
+                return None
+                
+            details = details_list[0]
+            liquid_hours = details.liquidHours
+            time_zone_id = details.timeZoneId
+            
+            try:
+                tz = ZoneInfo(time_zone_id)
+            except Exception:
+                tz = ZoneInfo('US/Eastern')
+                
+            now = datetime.now(tz)
+            today_str = now.strftime('%Y%m%d')
+            
+            hours_list = liquid_hours.split(';')
+            today_hours = None
+            for h in hours_list:
+                if h.startswith(today_str):
+                    today_hours = h
+                    break
+            
+            if not today_hours or "CLOSED" in today_hours:
+                return None
+                
+            parts = today_hours.split(':', 1)
+            current_intervals_str = parts[1] if len(parts) == 2 else today_hours
+            intervals = current_intervals_str.split(',')
+            
+            last_end_dt = None
+            default_date_str = parts[0] if len(parts) == 2 else today_str
+            
+            for interval in intervals:
+                if '-' not in interval: continue
+                _, end_str = interval.split('-')
+                
+                if ':' in end_str:
+                    d_str, t_str = end_str.split(':')
+                    end_dt = now.replace(year=int(d_str[:4]), month=int(d_str[4:6]), day=int(d_str[6:8]), 
+                                       hour=int(t_str[:2]), minute=int(t_str[2:]), second=0, microsecond=0)
+                else:
+                    end_dt = now.replace(year=int(default_date_str[:4]), month=int(default_date_str[4:6]), day=int(default_date_str[6:8]), 
+                                       hour=int(end_str[:2]), minute=int(end_str[2:]), second=0, microsecond=0)
+                
+                if last_end_dt is None or end_dt > last_end_dt:
+                    last_end_dt = end_dt
+                    
+            return last_end_dt
+            
+        except Exception as e:
+            logger.error(f"Error getting market close time: {e}")
+            return None

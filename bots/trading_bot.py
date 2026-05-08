@@ -2,6 +2,7 @@ import logging
 import re
 import unicodedata
 from datetime import datetime, timezone
+import asyncio
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 from config import settings
@@ -48,12 +49,36 @@ class UnifiedBot:
             filters.UpdateType.CHANNEL_POST & filters.TEXT,
             self.handle_signal
         ))
+        
+        # Add global error handler to log network/polling issues
+        self.app.add_error_handler(self.global_error_handler)
+
+    async def global_error_handler(self, update: object, context: ContextTypes.DEFAULT_TYPE):
+        logger.error(f"Telegram Bot caught an error: {context.error}")
 
     async def start(self):
         await self.app.initialize()
         await self.app.start()
         await self.app.updater.start_polling()
         logger.info("Unified Trading Bot started polling...")
+        
+        # Monitor the updater and restart if it crashes due to network errors
+        while True:
+            try:
+                await asyncio.sleep(60)
+                if self.app.updater and not self.app.updater.running:
+                    logger.error("Telegram polling stopped unexpectedly. Attempting to restart...")
+                    try:
+                        await self.app.updater.stop()
+                    except Exception as e:
+                        logger.debug(f"Error stopping stopped updater: {e}")
+                    
+                    await self.app.updater.start_polling()
+                    logger.info("Telegram polling restarted successfully.")
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.error(f"Error in Telegram polling monitor: {e}")
 
     async def stop(self):
         if self.app.updater and self.app.updater.running:

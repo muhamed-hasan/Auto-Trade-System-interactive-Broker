@@ -39,6 +39,8 @@ class WebServer:
         self.app.router.add_get('/api/status', self.handle_status)
         self.app.router.add_post('/api/settings/trade_power', self.handle_update_trade_power)
         self.app.router.add_post('/api/settings/auto_close_eod', self.handle_update_auto_close_eod)
+        self.app.router.add_get('/api/settings/config', self.handle_get_config)
+        self.app.router.add_post('/api/settings/config', self.handle_update_config)
         self.app.router.add_post('/api/shutdown', self.handle_shutdown)
         
         # TradingView Webhook endpoint - receives signals directly via HTTP POST
@@ -102,6 +104,102 @@ class WebServer:
             await self.db.set_system_state("auto_close_time_minutes", str(time_minutes))
             return web.json_response({"status": "success", "auto_close_signals_eod": enabled, "auto_close_time_minutes": time_minutes})
         except Exception as e:
+            return web.json_response({"error": str(e)}, status=500)
+
+    async def handle_get_config(self, request):
+        """Return current configuration values for the settings panel."""
+        try:
+            token = settings.TELEGRAM_SIGNAL_BOT_TOKEN or ''
+            # Mask token for display: show first 6 and last 4 chars
+            if len(token) > 10:
+                masked_token = token[:6] + '****' + token[-4:]
+            else:
+                masked_token = '****' if token else ''
+            
+            return web.json_response({
+                "telegram_bot_token_masked": masked_token,
+                "telegram_bot_token_set": bool(token),
+                "telegram_channel_id": str(settings.TELEGRAM_CHANNEL_ID) if settings.TELEGRAM_CHANNEL_ID else '',
+                "telegram_whitelist_ids": ','.join(str(uid) for uid in settings.TELEGRAM_WHITELIST_IDS) if settings.TELEGRAM_WHITELIST_IDS else '',
+                "ib_host": settings.IB_HOST,
+                "ib_port": settings.IB_PORT,
+                "ib_client_id": settings.IB_CLIENT_ID
+            })
+        except Exception as e:
+            return web.json_response({"error": str(e)}, status=500)
+
+    async def handle_update_config(self, request):
+        """Update configuration values and persist to .env file."""
+        try:
+            data = await request.json()
+            updated = []
+            
+            # Telegram Bot Token
+            if 'telegram_bot_token' in data and data['telegram_bot_token']:
+                val = data['telegram_bot_token'].strip()
+                settings.TELEGRAM_SIGNAL_BOT_TOKEN = val
+                settings.update_env_variable('TELEGRAM_SIGNAL_BOT_TOKEN', val)
+                updated.append('TELEGRAM_SIGNAL_BOT_TOKEN')
+            
+            # Telegram Channel ID
+            if 'telegram_channel_id' in data:
+                val = data['telegram_channel_id'].strip()
+                try:
+                    settings.TELEGRAM_CHANNEL_ID = int(val) if val else 0
+                    settings.update_env_variable('TELEGRAM_CHANNEL_ID', val)
+                    updated.append('TELEGRAM_CHANNEL_ID')
+                except ValueError:
+                    return web.json_response({"error": "Invalid Channel ID format"}, status=400)
+            
+            # Telegram Whitelist IDs
+            if 'telegram_whitelist_ids' in data:
+                val = data['telegram_whitelist_ids'].strip()
+                try:
+                    if val:
+                        settings.TELEGRAM_WHITELIST_IDS = [int(uid.strip()) for uid in val.split(',') if uid.strip()]
+                    else:
+                        settings.TELEGRAM_WHITELIST_IDS = []
+                    settings.update_env_variable('TELEGRAM_WHITELIST_IDS', val)
+                    updated.append('TELEGRAM_WHITELIST_IDS')
+                except ValueError:
+                    return web.json_response({"error": "Invalid Whitelist IDs format. Use comma-separated numbers."}, status=400)
+            
+            # IB Host
+            if 'ib_host' in data:
+                val = data['ib_host'].strip()
+                if val:
+                    settings.IB_HOST = val
+                    settings.update_env_variable('IB_HOST', val)
+                    updated.append('IB_HOST')
+            
+            # IB Port
+            if 'ib_port' in data:
+                try:
+                    port = int(data['ib_port'])
+                    settings.IB_PORT = port
+                    settings.update_env_variable('IB_PORT', str(port))
+                    updated.append('IB_PORT')
+                except (ValueError, TypeError):
+                    return web.json_response({"error": "Invalid port number"}, status=400)
+            
+            # IB Client ID
+            if 'ib_client_id' in data:
+                try:
+                    cid = int(data['ib_client_id'])
+                    settings.IB_CLIENT_ID = cid
+                    settings.update_env_variable('IB_CLIENT_ID', str(cid))
+                    updated.append('IB_CLIENT_ID')
+                except (ValueError, TypeError):
+                    return web.json_response({"error": "Invalid Client ID"}, status=400)
+            
+            # Clear cached telegram info so it re-fetches on next status poll
+            if any(k.startswith('TELEGRAM') for k in updated):
+                self._telegram_info = None
+            
+            logger.info(f"Config updated via dashboard: {', '.join(updated)}")
+            return web.json_response({"status": "success", "updated": updated})
+        except Exception as e:
+            logger.error(f"Error updating config: {e}")
             return web.json_response({"error": str(e)}, status=500)
 
     async def handle_index(self, request):

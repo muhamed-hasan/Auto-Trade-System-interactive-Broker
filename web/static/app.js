@@ -604,8 +604,192 @@ async function updateTradePower() {
     }
 }
 
-// Init
+// ─── Config Settings ───────────────────────────────────
+
+let configLoaded = false;
+
+async function loadConfigSettings() {
+    try {
+        const config = await fetch(`${API_BASE}/settings/config`).then(r => r.json());
+        if (config.error) return;
+
+        // Telegram fields — only populate if user is NOT focused on them
+        const tokenEl = document.getElementById('cfg-tg-token');
+        const channelEl = document.getElementById('cfg-tg-channel');
+        const whitelistEl = document.getElementById('cfg-tg-whitelist');
+        const tokenStatus = document.getElementById('cfg-tg-token-status');
+
+        if (tokenEl && document.activeElement !== tokenEl) {
+            if (!configLoaded && !tokenEl.value) {
+                // Don't fill real token — show placeholder from masked value
+                tokenEl.value = '';
+            }
+            if (tokenStatus) {
+                if (config.telegram_bot_token_set) {
+                    tokenStatus.innerHTML = `<span style="color:var(--accent-green);">● Set</span> <span style="color:var(--text-secondary);">${config.telegram_bot_token_masked}</span>`;
+                } else {
+                    tokenStatus.innerHTML = `<span style="color:var(--accent-red);">● Not configured</span>`;
+                }
+            }
+        }
+
+        if (channelEl && document.activeElement !== channelEl && !configLoaded) {
+            channelEl.value = config.telegram_channel_id || '';
+        }
+        if (whitelistEl && document.activeElement !== whitelistEl && !configLoaded) {
+            whitelistEl.value = config.telegram_whitelist_ids || '';
+        }
+
+        // IB fields in modal
+        const ibHost = document.getElementById('cfg-ib-host');
+        const ibPort = document.getElementById('cfg-ib-port');
+        const ibClient = document.getElementById('cfg-ib-client');
+
+        if (ibHost && document.activeElement !== ibHost && !configLoaded) {
+            ibHost.value = config.ib_host || '127.0.0.1';
+        }
+        if (ibPort && document.activeElement !== ibPort && !configLoaded) {
+            ibPort.value = config.ib_port || 4002;
+        }
+        if (ibClient && document.activeElement !== ibClient && !configLoaded) {
+            ibClient.value = config.ib_client_id || 1;
+        }
+
+        configLoaded = true;
+    } catch (e) {
+        console.error('Failed to load config:', e);
+    }
+}
+
+async function saveConnectionSettings() {
+    const btn = document.getElementById('cfg-save-btn');
+    const tokenEl = document.getElementById('cfg-tg-token');
+    const channelEl = document.getElementById('cfg-tg-channel');
+    const whitelistEl = document.getElementById('cfg-tg-whitelist');
+
+    const payload = {};
+    
+    // Only send token if user actually entered a new one
+    if (tokenEl && tokenEl.value.trim()) {
+        payload.telegram_bot_token = tokenEl.value.trim();
+    }
+    if (channelEl) {
+        payload.telegram_channel_id = channelEl.value.trim();
+    }
+    if (whitelistEl) {
+        payload.telegram_whitelist_ids = whitelistEl.value.trim();
+    }
+
+    if (Object.keys(payload).length === 0) {
+        showConfigToast('No changes to save', 'warn');
+        return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '<i data-lucide="loader" width="14"></i> Saving...';
+    lucide.createIcons({ nodes: [btn] });
+
+    try {
+        const res = await fetch(`${API_BASE}/settings/config`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+
+        if (data.status === 'success') {
+            showConfigToast('Connection settings saved!', 'success');
+            // Clear token field after save
+            if (tokenEl) tokenEl.value = '';
+            // Re-fetch to update masked display
+            configLoaded = false;
+            await loadConfigSettings();
+        } else {
+            showConfigToast(data.error || 'Save failed', 'error');
+        }
+    } catch (e) {
+        showConfigToast('Network error: ' + e.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i data-lucide="save" width="14"></i> Save Connection';
+        lucide.createIcons({ nodes: [btn] });
+    }
+}
+
+function openSettingsModal() {
+    const modal = document.getElementById('ib-settings-modal');
+    if (modal) {
+        modal.classList.add('visible');
+        document.body.style.overflow = 'hidden';
+        lucide.createIcons({ nodes: [modal] });
+    }
+}
+
+function closeSettingsModal() {
+    const modal = document.getElementById('ib-settings-modal');
+    if (modal) {
+        modal.classList.remove('visible');
+        document.body.style.overflow = '';
+    }
+}
+
+async function saveIBSettings() {
+    const hostEl = document.getElementById('cfg-ib-host');
+    const portEl = document.getElementById('cfg-ib-port');
+    const clientEl = document.getElementById('cfg-ib-client');
+
+    const payload = {};
+    if (hostEl && hostEl.value.trim()) payload.ib_host = hostEl.value.trim();
+    if (portEl && portEl.value) payload.ib_port = parseInt(portEl.value);
+    if (clientEl && clientEl.value) payload.ib_client_id = parseInt(clientEl.value);
+
+    if (Object.keys(payload).length === 0) {
+        showConfigToast('No changes to save', 'warn');
+        return;
+    }
+
+    try {
+        const res = await fetch(`${API_BASE}/settings/config`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+
+        if (data.status === 'success') {
+            showConfigToast('IB settings saved! Restart bot to apply.', 'success');
+            closeSettingsModal();
+        } else {
+            showConfigToast(data.error || 'Save failed', 'error');
+        }
+    } catch (e) {
+        showConfigToast('Network error: ' + e.message, 'error');
+    }
+}
+
+function showConfigToast(message, type) {
+    // Remove existing toasts
+    document.querySelectorAll('.config-toast').forEach(t => t.remove());
+
+    const toast = document.createElement('div');
+    toast.className = `config-toast config-toast-${type}`;
+    toast.innerHTML = message;
+    document.body.appendChild(toast);
+
+    // Trigger animation
+    requestAnimationFrame(() => toast.classList.add('visible'));
+
+    setTimeout(() => {
+        toast.classList.remove('visible');
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
+}
+
+// ─── Init ──────────────────────────────────────────────
+
 updateDashboard();
+loadConfigSettings();
+
 // Poll every 3 seconds for active content
 setInterval(() => {
     if (currentTab === 'dashboard') {

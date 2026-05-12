@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AutoTrade Professional</title>
-    <link rel="stylesheet" href="/static/index.css?v=4">
+    <link rel="stylesheet" href="/static/index.css?v=6">
     <script src="https://cdn.jsdelivr.net/npm/lucide@latest"></script>
     <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
 </head>
@@ -25,6 +25,9 @@
                             id="vix-val" class="ticker-value">---</span></span>
                 </div>
                 <div style="width: 1px; height: 24px; background: #334155; margin: 0 10px;"></div>
+                <button onclick="openSettingsModal()" class="settings-gear-btn" title="IB Connection Settings">
+                    <i data-lucide="settings" width="16"></i>
+                </button>
                 <button onclick="stopService()" class="stop-service-btn" title="Stop AutoTrade Service">
                     <i data-lucide="power" width="16"></i> Stop
                 </button>
@@ -122,6 +125,30 @@
                             <span style="font-size: 0.75rem; color: #94a3b8; margin-right: 4px;">min</span>
                             <input type="checkbox" id="auto-close-eod" onchange="toggleEODClose()" style="width: 16px; height: 16px; cursor: pointer; accent-color: var(--accent-blue);">
                         </div>
+                    </div>
+
+                    <!-- Telegram Connection Settings -->
+                    <div class="config-section">
+                        <div class="config-section-header">
+                            <i data-lucide="send" width="14"></i>
+                            <span>Telegram Connection</span>
+                        </div>
+                        <div class="config-field">
+                            <label for="cfg-tg-token">Bot Token</label>
+                            <input type="password" id="cfg-tg-token" class="config-input" placeholder="Enter bot token..." autocomplete="off">
+                            <div class="config-field-hint" id="cfg-tg-token-status"></div>
+                        </div>
+                        <div class="config-field">
+                            <label for="cfg-tg-channel">Channel ID</label>
+                            <input type="text" id="cfg-tg-channel" class="config-input" placeholder="e.g. -1001234567890" autocomplete="off">
+                        </div>
+                        <div class="config-field">
+                            <label for="cfg-tg-whitelist">Whitelist User IDs</label>
+                            <input type="text" id="cfg-tg-whitelist" class="config-input" placeholder="Comma separated, e.g. 123,456" autocomplete="off">
+                        </div>
+                        <button onclick="saveConnectionSettings()" class="config-save-btn" id="cfg-save-btn">
+                            <i data-lucide="save" width="14"></i> Save Connection
+                        </button>
                     </div>
                 </div>
             </section>
@@ -279,7 +306,45 @@
 
         </main>
     </div>
-    <script src="/static/app.js?v=6"></script>
+
+    <!-- IB Settings Modal -->
+    <div class="modal-overlay" id="ib-settings-modal">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <i data-lucide="radio-tower" width="18"></i>
+                    <span>IB Gateway Connection</span>
+                </div>
+                <button class="modal-close-btn" onclick="closeSettingsModal()">
+                    <i data-lucide="x" width="18"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p class="modal-desc">Configure your Interactive Brokers Gateway connection. Changes require a bot restart to take effect.</p>
+                <div class="config-field">
+                    <label for="cfg-ib-host">IB Host</label>
+                    <input type="text" id="cfg-ib-host" class="config-input" value="127.0.0.1" autocomplete="off">
+                </div>
+                <div class="config-field">
+                    <label for="cfg-ib-port">IB Port</label>
+                    <input type="number" id="cfg-ib-port" class="config-input" value="4002" autocomplete="off">
+                    <div class="config-field-hint">4001 = TWS Live, 4002 = Gateway Paper</div>
+                </div>
+                <div class="config-field">
+                    <label for="cfg-ib-client">Client ID</label>
+                    <input type="number" id="cfg-ib-client" class="config-input" value="1" autocomplete="off">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="modal-cancel-btn" onclick="closeSettingsModal()">Cancel</button>
+                <button class="modal-save-btn" onclick="saveIBSettings()">
+                    <i data-lucide="save" width="14"></i> Save Settings
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/app.js?v=7"></script>
     <script>
         lucide.createIcons();
     </script>

@@ -11,16 +11,28 @@ from core.pnl_engine import PnLEngine
 from bots.trading_bot import UnifiedBot
 from web.server import WebServer
 
+class IBErrorFilter(logging.Filter):
+    def filter(self, record):
+        # Suppress harmless IB warning messages
+        # Error 10349: Order TIF was set to DAY based on order preset.
+        msg = record.getMessage()
+        if "Error 10349" in msg or "Order TIF was set to DAY" in msg:
+            return False
+        return True
+
 # Configure logging
 # Create a custom logger
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
+
+ib_filter = IBErrorFilter()
 
 # 1. Console Handler - specific level (WARNING) to hide unimportant logs
 console_handler = logging.StreamHandler()
 console_handler.setLevel(logging.WARNING)
 console_format = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 console_handler.setFormatter(console_format)
+console_handler.addFilter(ib_filter)
 logger.addHandler(console_handler)
 
 # 2. Main Log File - INFO level (detailed)
@@ -28,12 +40,14 @@ file_handler = logging.FileHandler('autoTrade.log')
 file_handler.setLevel(logging.INFO)
 file_format = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 file_handler.setFormatter(file_format)
+file_handler.addFilter(ib_filter)
 logger.addHandler(file_handler)
 
 # 3. Error Log File - ERROR level (critical issues)
 error_handler = logging.FileHandler('errors.log')
 error_handler.setLevel(logging.ERROR)
 error_handler.setFormatter(file_format)
+error_handler.addFilter(ib_filter)
 logger.addHandler(error_handler)
 
 # 4. Trade Register Logger Setup

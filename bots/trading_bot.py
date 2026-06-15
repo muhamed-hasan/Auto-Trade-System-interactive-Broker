@@ -59,7 +59,7 @@ class UnifiedBot:
     async def start(self):
         await self.app.initialize()
         await self.app.start()
-        await self.app.updater.start_polling()
+        await self.app.updater.start_polling(drop_pending_updates=True)
         logger.info("Unified Trading Bot started polling...")
         
         # Monitor the updater and restart if it crashes due to network errors
@@ -218,8 +218,7 @@ class UnifiedBot:
 
         chat_id = update.effective_chat.id
         
-        # Prevent processing old messages on startup (older than 60 seconds)
-        # Increased from 10s because TradingView -> Telegram can have delivery latency
+        # Prevent processing old messages (older than MAX_SIGNAL_AGE_SECONDS)
         now = datetime.now(timezone.utc)
         if message.date:
             message_date = message.date
@@ -228,8 +227,8 @@ class UnifiedBot:
                 message_date = message_date.replace(tzinfo=timezone.utc)
             
             age = (now - message_date).total_seconds()
-            if age > 20:
-                logger.info(f"Ignoring old message from {chat_id} (age: {age:.1f}s)")
+            if age > settings.MAX_SIGNAL_AGE_SECONDS:
+                logger.info(f"Ignoring old message from {chat_id} (age: {age:.1f}s, threshold: {settings.MAX_SIGNAL_AGE_SECONDS}s)")
                 return
         
         # Filter by Channel ID if configured

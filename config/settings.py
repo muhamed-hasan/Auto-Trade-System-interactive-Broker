@@ -21,6 +21,8 @@ def update_env_variable(key, value):
             break
             
     if not key_found:
+        if lines and not lines[-1].endswith('\n'):
+            lines[-1] = lines[-1] + '\n'
         lines.append(f"{key}={value}\n")
         
     with open(env_path, 'w') as f:
@@ -42,6 +44,7 @@ IB_CLIENT_ID = int(os.getenv("IB_CLIENT_ID", "1"))
 TELEGRAM_SIGNAL_BOT_TOKEN = os.getenv("TELEGRAM_SIGNAL_BOT_TOKEN")
 TELEGRAM_CHANNEL_ID = int(os.getenv("TELEGRAM_CHANNEL_ID", "0"))
 TELEGRAM_WHITELIST_IDS = [int(id_str) for id_str in os.getenv("TELEGRAM_WHITELIST_IDS", "").split(",") if id_str]
+MAX_SIGNAL_AGE_SECONDS = int(os.getenv("MAX_SIGNAL_AGE_SECONDS", "300"))
 
 # --- Trading Mode ---
 # Options: 'paper', 'live'
